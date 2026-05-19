@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bucket Golf</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="logo">
+        <span class="logo-mark" aria-hidden="true">⛳</span>
+        <h1>Bucket Golf</h1>
+      </div>
+      <p class="tagline">Pick a course. Play 9 holes. Log your score.</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card" aria-labelledby="course-heading">
+      <h2 id="course-heading">1. Choose your course</h2>
+      <p class="muted">Each course is a 9-hole map. Hover a card to preview the layout.</p>
+      <div id="course-list" class="course-grid" role="radiogroup" aria-label="Course selection"></div>
+    </section>
+
+    <section class="card" aria-labelledby="map-heading">
+      <h2 id="map-heading">2. Course map</h2>
+      <div id="course-map" class="map">
+        <p class="map-empty">Select a course above to see the map.</p>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="score-heading">
+      <h2 id="score-heading">3. Upload your score</h2>
+      <p class="muted">Enter each hole, or upload a CSV / scorecard image.</p>
+
+      <div class="upload-row">
+        <label class="upload-btn">
+          <input type="file" id="file-input" accept=".csv,.txt,image/*" hidden />
+          <span>Upload scorecard (CSV or image)</span>
+        </label>
+        <button type="button" id="reset-btn" class="ghost-btn">Reset</button>
+      </div>
+      <p id="upload-status" class="upload-status" aria-live="polite"></p>
+
+      <form id="score-form" class="score-form">
+        <table class="scorecard">
+          <thead>
+            <tr>
+              <th>Hole</th>
+              <th>Par</th>
+              <th>Your score</th>
+            </tr>
+          </thead>
+          <tbody id="score-body"></tbody>
+          <tfoot>
+            <tr>
+              <th>Total</th>
+              <th id="par-total">—</th>
+              <th id="score-total">—</th>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div class="form-actions">
+          <button type="submit" class="primary-btn">Save round</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="rounds-heading">
+      <h2 id="rounds-heading">Saved rounds</h2>
+      <ul id="rounds-list" class="rounds-list">
+        <li class="muted">No rounds saved yet.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Built with ⛳ for Bucket Golf</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

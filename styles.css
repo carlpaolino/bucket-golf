@@ -1,0 +1,284 @@
+:root {
+  --red: #c8102e;
+  --red-dark: #9b0c23;
+  --red-soft: #ffe5ea;
+  --white: #ffffff;
+  --bg: #fff7f8;
+  --ink: #1f1f1f;
+  --muted: #6b6b6b;
+  --line: #f1d4da;
+  --shadow: 0 6px 20px rgba(200, 16, 46, 0.08);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
+}
+
+/* Hero */
+.hero {
+  background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
+  color: var(--white);
+  padding: 48px 20px 56px;
+  text-align: center;
+}
+.hero-inner { max-width: 900px; margin: 0 auto; }
+.logo { display: inline-flex; align-items: center; gap: 12px; }
+.logo-mark { font-size: 36px; }
+.hero h1 {
+  font-size: 36px;
+  margin: 0;
+  letter-spacing: -0.5px;
+  font-weight: 800;
+}
+.tagline {
+  margin: 10px 0 0;
+  opacity: 0.92;
+  font-size: 17px;
+}
+
+/* Layout */
+.container {
+  max-width: 900px;
+  margin: -28px auto 40px;
+  padding: 0 20px;
+  display: grid;
+  gap: 20px;
+}
+.card {
+  background: var(--white);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line);
+}
+.card h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  color: var(--red-dark);
+}
+.muted { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+
+/* Courses */
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.course-card {
+  cursor: pointer;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--white);
+  transition: all 0.15s ease;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.course-card:hover {
+  border-color: var(--red);
+  transform: translateY(-1px);
+}
+.course-card.selected {
+  border-color: var(--red);
+  background: var(--red-soft);
+  box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.15);
+}
+.course-card .name {
+  font-weight: 700;
+  color: var(--ink);
+}
+.course-card .meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Map */
+.map {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  min-height: 260px;
+  background: #fffafb;
+}
+.map-empty {
+  color: var(--muted);
+  text-align: center;
+  margin: 96px 0;
+}
+.map-svg { width: 100%; height: auto; display: block; }
+
+/* Score form */
+.upload-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.upload-btn {
+  display: inline-block;
+  padding: 10px 14px;
+  border: 2px dashed var(--red);
+  color: var(--red-dark);
+  background: var(--white);
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background 0.15s ease;
+}
+.upload-btn:hover { background: var(--red-soft); }
+.upload-status {
+  margin: 6px 0 14px;
+  font-size: 13px;
+  color: var(--muted);
+  min-height: 18px;
+}
+
+.scorecard {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+.scorecard th,
+.scorecard td {
+  text-align: center;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.scorecard thead th {
+  background: var(--red);
+  color: var(--white);
+  font-weight: 700;
+}
+.scorecard thead th:first-child { border-top-left-radius: 10px; }
+.scorecard thead th:last-child { border-top-right-radius: 10px; }
+.scorecard tfoot th {
+  background: var(--red-soft);
+  color: var(--red-dark);
+  font-weight: 700;
+}
+.scorecard input[type="number"] {
+  width: 70px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 14px;
+}
+.scorecard input[type="number"]:focus {
+  outline: none;
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.15);
+}
+
+.form-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.primary-btn {
+  background: var(--red);
+  color: var(--white);
+  border: none;
+  padding: 12px 22px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.primary-btn:hover { background: var(--red-dark); }
+.primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ghost-btn {
+  background: var(--white);
+  color: var(--red-dark);
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ghost-btn:hover {
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+
+/* Rounds */
+.rounds-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.rounds-list li {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+.rounds-list li.muted {
+  border: none;
+  background: transparent;
+  padding-left: 0;
+}
+.round-info { display: flex; flex-direction: column; }
+.round-course { font-weight: 700; color: var(--ink); }
+.round-meta { font-size: 12px; color: var(--muted); }
+.round-score {
+  background: var(--red);
+  color: var(--white);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+}
+.round-delete {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+.round-delete:hover { color: var(--red); }
+
+/* Footer */
+.footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 16px 12px 32px;
+}
+
+/* Map SVG styling */
+.hole-marker { fill: var(--red); }
+.hole-label { fill: var(--white); font-size: 10px; font-weight: 700; }
+.fairway { stroke: var(--red); stroke-width: 2; fill: none; stroke-dasharray: 4 4; opacity: 0.6; }
+.tee { fill: var(--red-dark); }
+.green { fill: var(--red); opacity: 0.2; stroke: var(--red); stroke-width: 1.5; }
+
+@media (max-width: 600px) {
+  .hero h1 { font-size: 28px; }
+  .card { padding: 18px; }
+  .scorecard input[type="number"] { width: 56px; }
+}
