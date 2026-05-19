@@ -43,6 +43,12 @@
     </section>
 
     <div id="app-content" hidden>
+      <nav class="app-tabs" role="tablist" aria-label="Main">
+        <button type="button" id="tab-btn-play" class="app-tab active" role="tab" aria-selected="true" data-tab="play">Play</button>
+        <button type="button" id="tab-btn-leaderboard" class="app-tab" role="tab" aria-selected="false" data-tab="leaderboard">Leaderboard</button>
+      </nav>
+
+      <div id="panel-play" class="app-tab-panel" role="tabpanel">
       <section class="card" aria-labelledby="course-heading">
         <h2 id="course-heading">1. Choose your course</h2>
         <p class="muted">Each course is a 9-hole map. Hover a card to preview the layout.</p>
@@ -96,8 +102,9 @@
             Enter scores above and your handicap updates automatically.
           </p>
 
-          <div class="form-actions">
-            <button type="submit" class="primary-btn">Save round</button>
+          <div class="form-actions score-actions">
+            <button type="button" id="cancel-edit-btn" class="ghost-btn" hidden>Cancel edit</button>
+            <button type="submit" id="save-round-btn" class="primary-btn">Save round</button>
           </div>
         </form>
       </section>
@@ -107,10 +114,25 @@
           <h2 id="rounds-heading">Saved rounds</h2>
           <span id="storage-badge" class="storage-badge" aria-live="polite">Local only</span>
         </div>
+        <p class="muted rounds-hint">Tap a round to edit · save again to log another.</p>
         <ul id="rounds-list" class="rounds-list">
           <li class="muted">No rounds saved yet.</li>
         </ul>
       </section>
+      </div>
+
+      <div id="panel-leaderboard" class="app-tab-panel" role="tabpanel" hidden>
+        <section class="card" aria-labelledby="leaderboard-heading">
+          <div class="rounds-header">
+            <h2 id="leaderboard-heading">Live leaderboard</h2>
+            <button type="button" id="leaderboard-refresh" class="ghost-btn">Refresh</button>
+          </div>
+          <p class="muted">Ranked by average score vs par (lower is better). Updates when you refresh or switch to this tab.</p>
+          <div id="leaderboard-wrap" class="leaderboard-wrap">
+            <p class="muted">Loading…</p>
+          </div>
+        </section>
+      </div>
     </div>
   </main>
 

@@ -70,9 +70,96 @@ html, body {
 .auth-form[hidden],
 .auth-bar[hidden],
 .auth-panel[hidden],
+.app-tab-panel[hidden],
 #app-content[hidden],
 #player-gate[hidden] {
   display: none !important;
+}
+
+/* App tabs */
+.app-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.app-tab {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+}
+.app-tab.active {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red-dark);
+}
+
+.score-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.rounds-hint { margin-top: -8px; }
+
+.rounds-list li.round-item {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.round-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.round-main:hover { background: var(--red-soft); }
+.round-item.editing {
+  border-color: var(--red);
+  box-shadow: 0 0 0 2px rgba(200, 16, 46, 0.2);
+}
+.round-item .round-delete {
+  padding: 12px 14px;
+  align-self: stretch;
+}
+
+.leaderboard-wrap { overflow-x: auto; margin-top: 8px; }
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.leaderboard-table th,
+.leaderboard-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+.leaderboard-table thead th {
+  background: var(--red);
+  color: var(--white);
+  font-weight: 700;
+}
+.leaderboard-table tbody tr.leaderboard-you {
+  background: var(--red-soft);
+  font-weight: 600;
+}
+.leaderboard-table td:last-child {
+  font-weight: 700;
+  color: var(--red-dark);
 }
 
 .player-search,

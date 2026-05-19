@@ -51,6 +51,8 @@ const STATE = {
   selectedCourseId: null,
   scores: [],
   profile: null, // { id, displayName }
+  editingRoundId: null,
+  activeTab: "play",
 };
 
 const STORAGE_KEY = "bucket-golf-rounds-v1";
@@ -169,6 +171,48 @@ function showAppForPlayer() {
   const nameEl = document.getElementById("active-player-name");
   const profile = getActiveProfile();
   if (nameEl && profile) nameEl.textContent = profile.displayName;
+  setAppTab("play");
+}
+
+function setAppTab(tab) {
+  STATE.activeTab = tab;
+  const isPlay = tab === "play";
+  document.getElementById("panel-play")?.toggleAttribute("hidden", !isPlay);
+  document.getElementById("panel-leaderboard")?.toggleAttribute("hidden", isPlay);
+  document.getElementById("tab-btn-play")?.classList.toggle("active", isPlay);
+  document.getElementById("tab-btn-leaderboard")?.classList.toggle("active", !isPlay);
+  document.getElementById("tab-btn-play")?.setAttribute("aria-selected", String(isPlay));
+  document.getElementById("tab-btn-leaderboard")?.setAttribute("aria-selected", String(!isPlay));
+  if (!isPlay) renderLeaderboard();
+}
+
+function clearEditMode() {
+  STATE.editingRoundId = null;
+  const btn = document.getElementById("save-round-btn");
+  const cancel = document.getElementById("cancel-edit-btn");
+  if (btn) btn.textContent = "Save round";
+  if (cancel) cancel.hidden = true;
+}
+
+function startEditRound(round) {
+  STATE.editingRoundId = round.id;
+  selectCourse(round.courseId);
+  STATE.scores = round.scores.map((s) => s);
+  renderScoreTable();
+  const btn = document.getElementById("save-round-btn");
+  const cancel = document.getElementById("cancel-edit-btn");
+  if (btn) btn.textContent = "Update round";
+  if (cancel) cancel.hidden = false;
+  setAppTab("play");
+  setUploadStatus(`Editing round from ${formatDate(round.date)}.`);
+  document.getElementById("score-heading")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function prepareNewRoundAfterSave() {
+  clearEditMode();
+  STATE.scores = Array(9).fill("");
+  renderScoreTable();
+  setAppTab("play");
 }
 
 async function ensureProfileRow(playerId, displayName) {
@@ -245,12 +289,19 @@ async function selectPlayer(displayName) {
 }
 
 function switchPlayer() {
+  clearEditMode();
   showPlayerGate();
   updateStorageBadge();
   const list = document.getElementById("rounds-list");
   if (list) list.innerHTML = `<li class="muted">Pick a player to see rounds.</li>`;
   renderPlayerOptions(document.getElementById("player-search")?.value || "");
   document.getElementById("player-search")?.focus();
+}
+
+function displayNameForProfileId(profileId) {
+  const roster = getPlayerRoster();
+  const match = roster.find((n) => playerIdFromName(n) === profileId);
+  return match || profileId;
 }
 
 async function initPlayerPicker() {
@@ -465,8 +516,9 @@ function updateHandicap() {
 }
 
 function formatHandicap(diff) {
-  if (diff === 0) return "E";
-  return diff > 0 ? `+${diff}` : `${diff}`;
+  const n = Math.round(diff * 10) / 10;
+  if (n === 0) return "E";
+  return n > 0 ? `+${n}` : `${String(n)}`;
 }
 
 /* -------- File upload -------- */
@@ -582,8 +634,26 @@ async function loadRounds() {
     return roundsForActiveProfile(readLocalRounds());
   }
   const rounds = data.map(rowToRound);
-  writeLocalRounds(rounds);
+  mergeLocalRoundsForProfile(profile.id, rounds);
   return rounds;
+}
+
+function mergeLocalRoundsForProfile(profileId, profileRounds) {
+  const all = readLocalRounds().filter((r) => r.profileId && r.profileId !== profileId);
+  writeLocalRounds(all.concat(profileRounds));
+}
+
+async function loadAllRounds() {
+  if (!USING_SUPABASE) return readLocalRounds();
+  const { data, error } = await SB
+    .from(ROUNDS_TABLE)
+    .select("*")
+    .order("played_at", { ascending: true });
+  if (error) {
+    console.warn("Could not load all rounds:", error.message);
+    return readLocalRounds();
+  }
+  return data.map(rowToRound);
 }
 
 async function saveRound(round) {
@@ -598,6 +668,35 @@ async function saveRound(round) {
 
   const cached = readLocalRounds();
   cached.push(round);
+  writeLocalRounds(cached);
+  return { ok: true };
+}
+
+async function updateRound(round) {
+  if (!USING_SUPABASE) {
+    const rounds = readLocalRounds();
+    const idx = rounds.findIndex((r) => r.id === round.id);
+    if (idx === -1) return { ok: false, error: { message: "Round not found" } };
+    rounds[idx] = round;
+    writeLocalRounds(rounds);
+    return { ok: true };
+  }
+  const { error } = await SB
+    .from(ROUNDS_TABLE)
+    .update({
+      course_id: round.courseId,
+      scores: round.scores,
+      total: round.total,
+      played_at: round.date,
+    })
+    .eq("id", round.id)
+    .eq("profile_id", round.profileId);
+  if (error) return { ok: false, error };
+
+  const cached = readLocalRounds();
+  const idx = cached.findIndex((r) => r.id === round.id);
+  if (idx >= 0) cached[idx] = round;
+  else cached.push(round);
   writeLocalRounds(cached);
   return { ok: true };
 }
@@ -651,17 +750,29 @@ async function renderRounds() {
       const diffStr =
         diff == null ? "" : diff === 0 ? "E" : diff > 0 ? `+${diff}` : `${diff}`;
 
+      const isEditing = STATE.editingRoundId === round.id;
       const li = document.createElement("li");
+      li.className = isEditing ? "round-item editing" : "round-item";
       li.innerHTML = `
-        <div class="round-info">
-          <span class="round-course">${courseName}</span>
-          <span class="round-meta">${formatDate(round.date)} · ${round.scores.join("-")}</span>
-        </div>
-        <span class="round-score">${round.total}${diffStr ? " (" + diffStr + ")" : ""}</span>
+        <button type="button" class="round-main" data-id="${round.id}">
+          <span class="round-info">
+            <span class="round-course">${courseName}</span>
+            <span class="round-meta">${formatDate(round.date)} · ${round.scores.join("-")}</span>
+          </span>
+          <span class="round-score">${round.total}${diffStr ? " (" + diffStr + ")" : ""}</span>
+        </button>
         <button type="button" class="round-delete" aria-label="Delete round" data-id="${round.id}">×</button>
       `;
       list.appendChild(li);
     });
+
+  list.querySelectorAll(".round-main").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      const round = rounds.find((r) => r.id === id);
+      if (round) startEditRound(round);
+    });
+  });
 
   list.querySelectorAll(".round-delete").forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -673,9 +784,120 @@ async function renderRounds() {
         btn.disabled = false;
         return;
       }
+      if (STATE.editingRoundId === id) clearEditMode();
       await renderRounds();
+      if (STATE.activeTab === "leaderboard") await renderLeaderboard();
     });
   });
+}
+
+function buildLeaderboardRows(allRounds) {
+  const byProfile = new Map();
+
+  for (const round of allRounds) {
+    const pid = round.profileId;
+    if (!pid) continue;
+    const course = COURSES.find((c) => c.id === round.courseId);
+    if (!course) continue;
+    const par = course.pars.reduce((a, b) => a + b, 0);
+    const diff = round.total - par;
+    if (!byProfile.has(pid)) {
+      byProfile.set(pid, { diffs: [], rounds: 0 });
+    }
+    const entry = byProfile.get(pid);
+    entry.diffs.push(diff);
+    entry.rounds += 1;
+  }
+
+  const rows = [];
+  for (const [profileId, data] of byProfile) {
+    const avg =
+      data.diffs.reduce((sum, d) => sum + d, 0) / data.diffs.length;
+    rows.push({
+      profileId,
+      name: displayNameForProfileId(profileId),
+      roundsPlayed: data.rounds,
+      avgHandicap: avg,
+    });
+  }
+
+  for (const name of getPlayerRoster()) {
+    const id = playerIdFromName(name);
+    if (!byProfile.has(id)) {
+      rows.push({
+        profileId: id,
+        name,
+        roundsPlayed: 0,
+        avgHandicap: null,
+      });
+    }
+  }
+
+  rows.sort((a, b) => {
+    if (a.roundsPlayed === 0 && b.roundsPlayed === 0) {
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    }
+    if (a.roundsPlayed === 0) return 1;
+    if (b.roundsPlayed === 0) return -1;
+    if (a.avgHandicap !== b.avgHandicap) return a.avgHandicap - b.avgHandicap;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
+
+  return rows;
+}
+
+async function renderLeaderboard() {
+  const wrap = document.getElementById("leaderboard-wrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `<p class="muted">Loading leaderboard…</p>`;
+  const allRounds = await loadAllRounds();
+  const rows = buildLeaderboardRows(allRounds);
+
+  if (rows.length === 0) {
+    wrap.innerHTML = `<p class="muted">No players on the roster yet.</p>`;
+    return;
+  }
+
+  const activeId = getActiveProfile()?.id;
+  let html = `
+    <table class="leaderboard-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Player</th>
+          <th>Rounds</th>
+          <th>Avg vs par</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  let rankNum = 0;
+  rows.forEach((row) => {
+    const rank = row.roundsPlayed > 0 ? ++rankNum : "—";
+    const hcap = row.avgHandicap == null ? "—" : formatHandicap(row.avgHandicap);
+    const you = row.profileId === activeId ? ' class="leaderboard-you"' : "";
+    html += `
+      <tr${you}>
+        <td>${rank}</td>
+        <td>${escapeHtml(row.name)}</td>
+        <td>${row.roundsPlayed}</td>
+        <td>${hcap}</td>
+      </tr>
+    `;
+  });
+
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function formatDate(iso) {
@@ -697,6 +919,16 @@ function currentCourse() {
 
 /* -------- Init -------- */
 
+function setupAppTabs() {
+  document.getElementById("tab-btn-play")?.addEventListener("click", () => setAppTab("play"));
+  document.getElementById("tab-btn-leaderboard")?.addEventListener("click", () => {
+    setAppTab("leaderboard");
+  });
+  document.getElementById("leaderboard-refresh")?.addEventListener("click", () => {
+    renderLeaderboard();
+  });
+}
+
 function setupPlayerUI() {
   const search = document.getElementById("player-search");
   search?.addEventListener("input", (e) => {
@@ -711,7 +943,7 @@ function setupPlayerUI() {
     if (btn) btn.disabled = false;
   });
 
-  select?.addEventListener("dblclick", () => {
+  document.getElementById("player-select")?.addEventListener("dblclick", () => {
     document.getElementById("player-continue")?.click();
   });
 
@@ -720,6 +952,7 @@ function setupPlayerUI() {
 
 async function init() {
   renderCourses();
+  setupAppTabs();
   setupPlayerUI();
   updateHandicap();
   await initPlayerPicker();
@@ -732,9 +965,17 @@ async function init() {
 
   document.getElementById("reset-btn").addEventListener("click", () => {
     if (!currentCourse()) return;
+    clearEditMode();
     STATE.scores = Array(9).fill("");
     renderScoreTable();
     setUploadStatus("");
+  });
+
+  document.getElementById("cancel-edit-btn")?.addEventListener("click", () => {
+    clearEditMode();
+    STATE.scores = Array(9).fill("");
+    renderScoreTable();
+    setUploadStatus("Edit cancelled.");
   });
 
   document.getElementById("score-form").addEventListener("submit", async (e) => {
@@ -742,7 +983,6 @@ async function init() {
     const profile = getActiveProfile();
     if (!profile) {
       setUploadStatus("Pick a player first.", true);
-      switchPlayer();
       return;
     }
     const course = currentCourse();
@@ -757,20 +997,28 @@ async function init() {
     }
 
     const total = scores.reduce((a, b) => a + b, 0);
+    const isEdit = Boolean(STATE.editingRoundId);
+    let playedAt = new Date().toISOString();
+    if (isEdit) {
+      const existing = (await loadRounds()).find((r) => r.id === STATE.editingRoundId);
+      if (existing?.date) playedAt = existing.date;
+    }
     const round = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      id: isEdit
+        ? STATE.editingRoundId
+        : Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       profileId: profile.id,
       courseId: course.id,
       scores,
       total,
-      date: new Date().toISOString(),
+      date: playedAt,
     };
 
-    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const submitBtn = document.getElementById("save-round-btn");
     if (submitBtn) submitBtn.disabled = true;
-    setUploadStatus(USING_SUPABASE ? "Saving to Supabase…" : "Saving locally…");
+    setUploadStatus(isEdit ? "Updating round…" : USING_SUPABASE ? "Saving…" : "Saving locally…");
 
-    const result = await saveRound(round);
+    const result = isEdit ? await updateRound(round) : await saveRound(round);
     if (submitBtn) submitBtn.disabled = false;
 
     if (!result.ok) {
@@ -778,11 +1026,16 @@ async function init() {
       return;
     }
 
+    prepareNewRoundAfterSave();
     await renderRounds();
+    if (STATE.activeTab === "leaderboard") await renderLeaderboard();
+
+    const par = course.pars.reduce((a, b) => a + b, 0);
+    const diffStr = formatHandicap(total - par);
     setUploadStatus(
-      USING_SUPABASE
-        ? `Round saved to Supabase! Total: ${total}.`
-        : `Round saved locally. Total: ${total}. (Set up Supabase to sync across devices.)`
+      isEdit
+        ? `Round updated! Total ${total} (${diffStr}). Enter scores for another round below.`
+        : `Round saved! Total ${total} (${diffStr}). Enter scores for another round below.`
     );
   });
 }
