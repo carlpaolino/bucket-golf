@@ -14,107 +14,104 @@
         <h1>Bucket Golf</h1>
       </div>
       <p class="tagline">Pick a course. Play 9 holes. Log your score.</p>
+      <div id="player-bar" class="auth-bar" hidden>
+        <span class="auth-greeting">Playing as <strong id="active-player-name"></strong></span>
+        <button type="button" id="switch-player-btn" class="ghost-btn ghost-btn-light">Switch player</button>
+      </div>
     </div>
   </header>
 
   <main class="container">
-    <section class="card profile-card" aria-labelledby="profile-heading">
-      <h2 id="profile-heading">Your profile</h2>
-      <p class="muted">Enter a name once — your saved rounds stay linked to you.</p>
+    <section id="player-gate" class="card auth-card" aria-labelledby="player-heading">
+      <h2 id="player-heading">Who's playing?</h2>
+      <p class="muted">Choose your name from the list to save rounds.</p>
 
-      <form id="profile-form" class="profile-form">
-        <label class="profile-label" for="profile-name">Display name</label>
-        <div class="profile-row">
-          <input
-            type="text"
-            id="profile-name"
-            name="displayName"
-            maxlength="40"
-            placeholder="e.g. Carl"
-            autocomplete="nickname"
-            required
-          />
-          <button type="submit" class="primary-btn">Save profile</button>
+      <label class="auth-label" for="player-search">Search</label>
+      <input
+        type="search"
+        id="player-search"
+        class="player-search"
+        placeholder="Type to filter names…"
+        autocomplete="off"
+      />
+
+      <label class="auth-label" for="player-select">Player</label>
+      <select id="player-select" class="player-select" size="10" aria-label="Player list"></select>
+
+      <button type="button" id="player-continue" class="primary-btn auth-submit">Continue</button>
+      <p id="player-status" class="auth-status" aria-live="polite"></p>
+    </section>
+
+    <div id="app-content" hidden>
+      <section class="card" aria-labelledby="course-heading">
+        <h2 id="course-heading">1. Choose your course</h2>
+        <p class="muted">Each course is a 9-hole map. Hover a card to preview the layout.</p>
+        <div id="course-list" class="course-grid" role="radiogroup" aria-label="Course selection"></div>
+      </section>
+
+      <section class="card" aria-labelledby="map-heading">
+        <h2 id="map-heading">2. Course map</h2>
+        <div id="course-map" class="map">
+          <p class="map-empty">Select a course above to see the map.</p>
         </div>
-      </form>
+      </section>
 
-      <div id="profile-display" class="profile-display" hidden>
-        <p class="profile-greeting">
-          Playing as <strong id="profile-name-display"></strong>
-        </p>
-        <button type="button" id="profile-edit-btn" class="ghost-btn">Change name</button>
-      </div>
-      <p id="profile-status" class="profile-status" aria-live="polite"></p>
-    </section>
+      <section class="card" aria-labelledby="score-heading">
+        <h2 id="score-heading">3. Upload your score</h2>
+        <p class="muted">Enter each hole, or upload a CSV / scorecard image.</p>
 
-    <section class="card" aria-labelledby="course-heading">
-      <h2 id="course-heading">1. Choose your course</h2>
-      <p class="muted">Each course is a 9-hole map. Hover a card to preview the layout.</p>
-      <div id="course-list" class="course-grid" role="radiogroup" aria-label="Course selection"></div>
-    </section>
-
-    <section class="card" aria-labelledby="map-heading">
-      <h2 id="map-heading">2. Course map</h2>
-      <div id="course-map" class="map">
-        <p class="map-empty">Select a course above to see the map.</p>
-      </div>
-    </section>
-
-    <section class="card" aria-labelledby="score-heading">
-      <h2 id="score-heading">3. Upload your score</h2>
-      <p class="muted">Enter each hole, or upload a CSV / scorecard image.</p>
-
-      <div class="upload-row">
-        <label class="upload-btn">
-          <input type="file" id="file-input" accept=".csv,.txt,image/*" hidden />
-          <span>Upload scorecard (CSV or image)</span>
-        </label>
-        <button type="button" id="reset-btn" class="ghost-btn">Reset</button>
-      </div>
-      <p id="upload-status" class="upload-status" aria-live="polite"></p>
-
-      <form id="score-form" class="score-form">
-        <table class="scorecard">
-          <thead>
-            <tr>
-              <th>Hole</th>
-              <th>Par</th>
-              <th>Your score</th>
-            </tr>
-          </thead>
-          <tbody id="score-body"></tbody>
-          <tfoot>
-            <tr>
-              <th>Total</th>
-              <th id="par-total">—</th>
-              <th id="score-total">—</th>
-            </tr>
-            <tr class="handicap-row">
-              <th colspan="2">Handicap (to par)</th>
-              <th id="handicap-total" aria-live="polite">—</th>
-            </tr>
-          </tfoot>
-        </table>
-
-        <p id="handicap-note" class="handicap-note muted" aria-live="polite">
-          Enter scores above and your handicap updates automatically.
-        </p>
-
-        <div class="form-actions">
-          <button type="submit" class="primary-btn">Save round</button>
+        <div class="upload-row">
+          <label class="upload-btn">
+            <input type="file" id="file-input" accept=".csv,.txt,image/*" hidden />
+            <span>Upload scorecard (CSV or image)</span>
+          </label>
+          <button type="button" id="reset-btn" class="ghost-btn">Reset</button>
         </div>
-      </form>
-    </section>
+        <p id="upload-status" class="upload-status" aria-live="polite"></p>
 
-    <section class="card" aria-labelledby="rounds-heading">
-      <div class="rounds-header">
-        <h2 id="rounds-heading">Saved rounds</h2>
-        <span id="storage-badge" class="storage-badge" aria-live="polite">Local only</span>
-      </div>
-      <ul id="rounds-list" class="rounds-list">
-        <li class="muted">No rounds saved yet.</li>
-      </ul>
-    </section>
+        <form id="score-form" class="score-form">
+          <table class="scorecard">
+            <thead>
+              <tr>
+                <th>Hole</th>
+                <th>Par</th>
+                <th>Your score</th>
+              </tr>
+            </thead>
+            <tbody id="score-body"></tbody>
+            <tfoot>
+              <tr>
+                <th>Total</th>
+                <th id="par-total">—</th>
+                <th id="score-total">—</th>
+              </tr>
+              <tr class="handicap-row">
+                <th colspan="2">Handicap (to par)</th>
+                <th id="handicap-total" aria-live="polite">—</th>
+              </tr>
+            </tfoot>
+          </table>
+
+          <p id="handicap-note" class="handicap-note muted" aria-live="polite">
+            Enter scores above and your handicap updates automatically.
+          </p>
+
+          <div class="form-actions">
+            <button type="submit" class="primary-btn">Save round</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card" aria-labelledby="rounds-heading">
+        <div class="rounds-header">
+          <h2 id="rounds-heading">Saved rounds</h2>
+          <span id="storage-badge" class="storage-badge" aria-live="polite">Local only</span>
+        </div>
+        <ul id="rounds-list" class="rounds-list">
+          <li class="muted">No rounds saved yet.</li>
+        </ul>
+      </section>
+    </div>
   </main>
 
   <footer class="footer">
@@ -122,6 +119,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="players.js"></script>
   <script src="config.js" onerror="window.__noConfig=true"></script>
   <script src="script.js"></script>
 </body>

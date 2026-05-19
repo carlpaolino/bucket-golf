@@ -54,7 +54,7 @@ const STATE = {
 };
 
 const STORAGE_KEY = "bucket-golf-rounds-v1";
-const PROFILE_STORAGE_KEY = "bucket-golf-profile-v1";
+const PLAYER_STORAGE_KEY = "bucket-golf-player-v1";
 
 /* -------- Supabase client (optional) --------
  *
@@ -89,113 +89,197 @@ const USING_SUPABASE = SB !== null;
 function updateStorageBadge() {
   const badge = document.getElementById("storage-badge");
   if (!badge) return;
-  if (USING_SUPABASE) {
+  if (USING_SUPABASE && getActiveProfile()) {
     badge.textContent = "Synced to Supabase";
     badge.classList.add("synced");
+  } else if (USING_SUPABASE) {
+    badge.textContent = "Pick a player to sync";
+    badge.classList.remove("synced");
   } else {
     badge.textContent = "Local only";
     badge.classList.remove("synced");
   }
 }
 
-/* -------- Profile -------- */
+/* -------- Player picker -------- */
 
-function newProfileId() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
+function getPlayerRoster() {
+  const list = window.BUCKET_GOLF_PLAYERS;
+  if (!Array.isArray(list) || list.length === 0) return [];
+  const seen = new Set();
+  const names = [];
+  for (const raw of list) {
+    const name = String(raw).trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
   }
-  return "p_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  return names.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
-function readStoredProfile() {
-  try {
-    const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredProfile(profile) {
-  localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+function playerIdFromName(name) {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return slug || "player";
 }
 
 function getActiveProfile() {
   const p = STATE.profile;
-  if (!p || !p.id) return null;
+  if (!p?.id) return null;
   const name = (p.displayName || "").trim();
   if (!name) return null;
   return { id: p.id, displayName: name };
 }
 
-function loadProfileFromStorage() {
-  const stored = readStoredProfile();
-  STATE.profile = stored && stored.id
-    ? { id: stored.id, displayName: stored.displayName || "" }
-    : { id: newProfileId(), displayName: "" };
-  if (!stored) writeStoredProfile(STATE.profile);
+function readStoredPlayerName() {
+  try {
+    return localStorage.getItem(PLAYER_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
 }
 
-function setProfileStatus(msg, isError = false) {
-  const el = document.getElementById("profile-status");
+function writeStoredPlayerName(name) {
+  localStorage.setItem(PLAYER_STORAGE_KEY, name);
+}
+
+function setPlayerStatus(msg, isError = false) {
+  const el = document.getElementById("player-status");
   if (!el) return;
   el.textContent = msg;
   el.style.color = isError ? "var(--red-dark)" : "var(--muted)";
 }
 
-function renderProfileUI() {
-  const profile = getActiveProfile();
-  const form = document.getElementById("profile-form");
-  const display = document.getElementById("profile-display");
-  const nameInput = document.getElementById("profile-name");
-  const nameDisplay = document.getElementById("profile-name-display");
-
-  if (!form || !display) return;
-
-  if (profile) {
-    form.hidden = true;
-    display.hidden = false;
-    if (nameDisplay) nameDisplay.textContent = profile.displayName;
-  } else {
-    form.hidden = false;
-    display.hidden = true;
-    if (nameInput) nameInput.value = STATE.profile.displayName || "";
-    nameInput?.focus();
-  }
+function showPlayerGate() {
+  document.getElementById("player-gate")?.removeAttribute("hidden");
+  document.getElementById("app-content")?.setAttribute("hidden", "");
+  document.getElementById("player-bar")?.setAttribute("hidden", "");
+  STATE.profile = null;
 }
 
-async function saveProfile(displayName) {
-  const trimmed = displayName.trim();
-  if (!trimmed) {
-    setProfileStatus("Please enter a name.", true);
-    return { ok: false };
+function showAppForPlayer() {
+  document.getElementById("player-gate")?.setAttribute("hidden", "");
+  document.getElementById("app-content")?.removeAttribute("hidden");
+  document.getElementById("player-bar")?.removeAttribute("hidden");
+  const nameEl = document.getElementById("active-player-name");
+  const profile = getActiveProfile();
+  if (nameEl && profile) nameEl.textContent = profile.displayName;
+}
+
+async function ensureProfileRow(playerId, displayName) {
+  if (!USING_SUPABASE) return;
+  const username = playerIdFromName(displayName);
+  const { error } = await SB.from(PROFILES_TABLE).upsert({
+    id: playerId,
+    username,
+    display_name: displayName,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+function renderPlayerOptions(filterText = "") {
+  const select = document.getElementById("player-select");
+  if (!select) return;
+
+  const q = filterText.trim().toLowerCase();
+  const roster = getPlayerRoster();
+  const filtered = q
+    ? roster.filter((name) => name.toLowerCase().includes(q))
+    : roster;
+
+  select.innerHTML = "";
+  if (filtered.length === 0) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = roster.length === 0 ? "No players in players.js" : "No matches";
+    opt.disabled = true;
+    select.appendChild(opt);
+    return;
   }
 
-  if (!STATE.profile?.id) {
-    STATE.profile = { id: newProfileId(), displayName: trimmed };
-  } else {
-    STATE.profile.displayName = trimmed;
-  }
-  writeStoredProfile(STATE.profile);
+  filtered.forEach((name) => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    select.appendChild(opt);
+  });
+  select.selectedIndex = 0;
+}
 
-  if (USING_SUPABASE) {
-    const { error } = await SB.from(PROFILES_TABLE).upsert({
-      id: STATE.profile.id,
-      display_name: trimmed,
-      updated_at: new Date().toISOString(),
-    });
-    if (error) {
-      setProfileStatus("Could not sync profile: " + error.message, true);
-      return { ok: false, error };
-    }
-    setProfileStatus("Profile saved and synced.");
-  } else {
-    setProfileStatus("Profile saved on this device.");
+async function selectPlayer(displayName) {
+  const name = displayName.trim();
+  const roster = getPlayerRoster();
+  if (!name) {
+    setPlayerStatus("Pick a name from the list.", true);
+    return;
+  }
+  if (!roster.some((n) => n.toLowerCase() === name.toLowerCase())) {
+    setPlayerStatus("That name is not on the player list.", true);
+    return;
   }
 
-  renderProfileUI();
+  const canonical = roster.find((n) => n.toLowerCase() === name.toLowerCase());
+  const playerId = playerIdFromName(canonical);
+
+  setPlayerStatus("Loading…");
+  try {
+    if (USING_SUPABASE) await ensureProfileRow(playerId, canonical);
+  } catch (err) {
+    setPlayerStatus("Could not save profile: " + err.message, true);
+    return;
+  }
+
+  STATE.profile = { id: playerId, displayName: canonical };
+  writeStoredPlayerName(canonical);
+  setPlayerStatus("");
+  showAppForPlayer();
+  updateStorageBadge();
   await renderRounds();
-  return { ok: true };
+  updateHandicap();
+}
+
+function switchPlayer() {
+  showPlayerGate();
+  updateStorageBadge();
+  const list = document.getElementById("rounds-list");
+  if (list) list.innerHTML = `<li class="muted">Pick a player to see rounds.</li>`;
+  renderPlayerOptions(document.getElementById("player-search")?.value || "");
+  document.getElementById("player-search")?.focus();
+}
+
+async function initPlayerPicker() {
+  const roster = getPlayerRoster();
+  if (roster.length === 0) {
+    setPlayerStatus("Add names to players.js (window.BUCKET_GOLF_PLAYERS).", true);
+    showPlayerGate();
+    return;
+  }
+
+  renderPlayerOptions();
+
+  const saved = readStoredPlayerName();
+  if (saved && roster.some((n) => n.toLowerCase() === saved.toLowerCase())) {
+    const select = document.getElementById("player-select");
+    if (select) {
+      for (const opt of select.options) {
+        if (opt.value.toLowerCase() === saved.toLowerCase()) {
+          opt.selected = true;
+          break;
+        }
+      }
+    }
+    await selectPlayer(saved);
+    return;
+  }
+
+  showPlayerGate();
+  document.getElementById("player-search")?.focus();
 }
 
 /* -------- Course list -------- */
@@ -542,7 +626,7 @@ async function renderRounds() {
   if (!list) return;
 
   if (!getActiveProfile()) {
-    list.innerHTML = `<li class="muted">Set up your profile above to save rounds.</li>`;
+    list.innerHTML = `<li class="muted">Pick a player to see your rounds.</li>`;
     return;
   }
 
@@ -613,35 +697,32 @@ function currentCourse() {
 
 /* -------- Init -------- */
 
-function init() {
-  loadProfileFromStorage();
-  renderProfileUI();
-  renderCourses();
-  updateStorageBadge();
-  renderRounds();
-  updateHandicap();
+function setupPlayerUI() {
+  const search = document.getElementById("player-search");
+  search?.addEventListener("input", (e) => {
+    renderPlayerOptions(e.target.value);
+  });
 
-  document.getElementById("profile-form")?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const input = document.getElementById("profile-name");
-    const btn = e.target.querySelector('button[type="submit"]');
+  document.getElementById("player-continue")?.addEventListener("click", async () => {
+    const select = document.getElementById("player-select");
+    const btn = document.getElementById("player-continue");
     if (btn) btn.disabled = true;
-    await saveProfile(input?.value || "");
+    await selectPlayer(select?.value || "");
     if (btn) btn.disabled = false;
   });
 
-  document.getElementById("profile-edit-btn")?.addEventListener("click", () => {
-    const form = document.getElementById("profile-form");
-    const display = document.getElementById("profile-display");
-    const input = document.getElementById("profile-name");
-    if (form) form.hidden = false;
-    if (display) display.hidden = true;
-    if (input) {
-      input.value = STATE.profile?.displayName || "";
-      input.focus();
-    }
-    setProfileStatus("");
+  select?.addEventListener("dblclick", () => {
+    document.getElementById("player-continue")?.click();
   });
+
+  document.getElementById("switch-player-btn")?.addEventListener("click", switchPlayer);
+}
+
+async function init() {
+  renderCourses();
+  setupPlayerUI();
+  updateHandicap();
+  await initPlayerPicker();
 
   document.getElementById("file-input").addEventListener("change", (e) => {
     const file = e.target.files && e.target.files[0];
@@ -660,8 +741,8 @@ function init() {
     e.preventDefault();
     const profile = getActiveProfile();
     if (!profile) {
-      setUploadStatus("Set up your profile first (name at the top).", true);
-      document.getElementById("profile-name")?.focus();
+      setUploadStatus("Pick a player first.", true);
+      switchPlayer();
       return;
     }
     const course = currentCourse();
@@ -706,4 +787,6 @@ function init() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", () => {
+  init().catch((err) => console.error(err));
+});

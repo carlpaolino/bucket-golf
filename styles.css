@@ -66,48 +66,109 @@ html, body {
 }
 .muted { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
 
-/* Profile */
-.profile-form { margin-top: 4px; }
-.profile-label {
-  display: block;
+/* Auth — display:flex on children overrides [hidden]; force hide */
+.auth-form[hidden],
+.auth-bar[hidden],
+.auth-panel[hidden],
+#app-content[hidden],
+#player-gate[hidden] {
+  display: none !important;
+}
+
+.player-search,
+.player-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+.player-search:focus,
+.player-select:focus {
+  outline: none;
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.15);
+}
+.player-select {
+  font-family: inherit;
+  background: var(--white);
+}
+
+.auth-card { max-width: 420px; margin: 0 auto; }
+.auth-bar {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.auth-greeting { font-size: 15px; opacity: 0.95; }
+.auth-greeting strong { font-weight: 700; }
+.ghost-btn-light {
+  color: var(--white);
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.1);
+}
+.ghost-btn-light:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--white);
+}
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+.auth-tab {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+.auth-tab.active {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red-dark);
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.auth-label {
   font-size: 13px;
   font-weight: 600;
   color: var(--red-dark);
-  margin-bottom: 6px;
+  margin-bottom: -4px;
 }
-.profile-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-}
-.profile-row input[type="text"] {
-  flex: 1 1 180px;
-  min-width: 0;
+.auth-form input {
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
   font-size: 15px;
 }
-.profile-row input[type="text"]:focus {
+.auth-form input:focus {
   outline: none;
   border-color: var(--red);
   box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.15);
 }
-.profile-display {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.auth-panel-title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: var(--red-dark);
 }
-.profile-greeting {
-  margin: 0;
-  font-size: 16px;
+.auth-panel-lead {
+  margin: 0 0 14px !important;
 }
-.profile-greeting strong { color: var(--red-dark); }
-.profile-status {
-  margin: 8px 0 0;
+.auth-submit { margin-top: 6px; width: 100%; }
+.auth-status {
+  margin: 10px 0 0;
   font-size: 13px;
   color: var(--muted);
   min-height: 18px;

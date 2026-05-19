@@ -13,8 +13,8 @@ Built with vanilla HTML / CSS / JavaScript — no build step required.
 - Manual score entry per hole with live total + par comparison.
 - Upload a CSV / TXT scorecard (any whitespace- or comma-separated list of 9
   numbers) to auto-fill scores.
-- **Simple profile** — enter a name once; every round is stored under your
-  profile id (synced to Supabase when configured).
+- **Player picker** — choose your name from a roster (`players.js`, ~100 names);
+  the golf app appears after you pick who’s playing.
 - Rounds persist to **Supabase** when configured, with a `localStorage`
   fallback so the app still works offline.
 - Red & white theme.
@@ -37,6 +37,7 @@ To sync rounds to a real database, follow the Supabase setup below.
 - `index.html` — markup
 - `styles.css` — red & white theme
 - `script.js` — courses, score logic, persistence
+- `players.js` — list of player names (edit `window.BUCKET_GOLF_PLAYERS`)
 - `config.example.js` — Supabase config template (copy to `config.js`)
 - `supabase/schema.sql` — full database schema (profiles + rounds)
 - `supabase/migrate-profiles.sql` — upgrade script if you already have `rounds`
@@ -95,13 +96,36 @@ cp config.example.js config.js
 
 `config.js` is gitignored, so your keys won't be committed.
 
-### 5. Reload the app
+### 5. Add your player names
 
-Refresh the page. The **Saved rounds** card should now show a green
-**"Synced to Supabase"** badge instead of **"Local only"**. Saving a round
-will insert a row into `public.rounds`; deleting removes it. You can verify
-this in the Supabase dashboard under **Table Editor → rounds**.
+Edit [`players.js`](players.js) and replace the placeholder list with your real
+names (one string per player, ~100 entries). Example:
 
-If you ever see "Local only" after configuring `config.js`, open the browser
-devtools console — the app logs why it fell back (bad URL, network blocked,
-SDK failed to load, etc.).
+```javascript
+window.BUCKET_GOLF_PLAYERS = [
+  "Alex Johnson",
+  "Sam Rivera",
+  // …
+];
+```
+
+Run migrations if you use the CLI:
+
+```bash
+supabase db push
+```
+
+### 6. Reload the app
+
+1. Open the app — you should see **Who's playing?** with a searchable list.
+2. Pick your name and click **Continue**.
+3. The course picker and scorecard appear; the header shows **Playing as …** with
+   **Switch player**.
+4. **Saved rounds** should show a green **Synced to Supabase** badge when
+   `config.js` is set up.
+
+Your last chosen name is remembered on this device. Anyone can pick any name on
+the list (honor system).
+
+If you see errors saving rounds, run `supabase db push` so the latest RLS
+migration is applied.
