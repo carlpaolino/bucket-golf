@@ -144,6 +144,7 @@ function renderScoreTable() {
   if (!course) {
     parTotalEl.textContent = "—";
     scoreTotalEl.textContent = "—";
+    updateHandicap();
     return;
   }
 
@@ -179,6 +180,65 @@ function updateScoreTotal() {
     return Number.isFinite(v) && v > 0 ? sum + v : sum;
   }, 0);
   document.getElementById("score-total").textContent = total > 0 ? total : "—";
+  updateHandicap();
+}
+
+/* -------- Handicap -------- */
+
+// Live handicap = (sum of scores entered so far) - (sum of par for those same holes).
+// We only count holes that have a valid score so the number stays meaningful
+// while the card is being filled in.
+function updateHandicap() {
+  const el = document.getElementById("handicap-total");
+  const note = document.getElementById("handicap-note");
+  if (!el) return;
+
+  const course = currentCourse();
+  el.classList.remove("under", "over", "even");
+
+  if (!course) {
+    el.textContent = "—";
+    if (note) note.textContent = "Pick a course to start tracking your handicap.";
+    return;
+  }
+
+  let scoreSum = 0;
+  let parSum = 0;
+  let holesEntered = 0;
+  STATE.scores.forEach((s, i) => {
+    const v = Number(s);
+    if (Number.isFinite(v) && v > 0) {
+      scoreSum += v;
+      parSum += course.pars[i];
+      holesEntered += 1;
+    }
+  });
+
+  if (holesEntered === 0) {
+    el.textContent = "—";
+    if (note) {
+      note.textContent = "Enter scores above and your handicap updates automatically.";
+    }
+    return;
+  }
+
+  const diff = scoreSum - parSum;
+  el.textContent = formatHandicap(diff);
+
+  if (diff < 0) el.classList.add("under");
+  else if (diff > 0) el.classList.add("over");
+  else el.classList.add("even");
+
+  if (note) {
+    const holesLabel = holesEntered === 1 ? "1 hole" : `${holesEntered} holes`;
+    const parLabel = diff === 0 ? "even with par" : diff > 0 ? "over par" : "under par";
+    note.textContent = `Through ${holesLabel}: ${formatHandicap(diff)} (${parLabel}).`;
+  }
+}
+
+function formatHandicap(diff) {
+  if (diff === 0) return "E";
+  return diff > 0 ? `+${diff}` : `${diff}`;
 }
 
 /* -------- File upload -------- */
@@ -310,6 +370,7 @@ function currentCourse() {
 function init() {
   renderCourses();
   renderRounds();
+  updateHandicap();
 
   document.getElementById("file-input").addEventListener("change", (e) => {
     const file = e.target.files && e.target.files[0];

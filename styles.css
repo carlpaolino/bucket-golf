@@ -169,6 +169,34 @@ html, body {
   color: var(--red-dark);
   font-weight: 700;
 }
+.scorecard tfoot .handicap-row th {
+  background: var(--white);
+  color: var(--ink);
+  border-top: 2px solid var(--red-soft);
+  font-size: 13px;
+  letter-spacing: 0.2px;
+}
+.scorecard tfoot .handicap-row #handicap-total {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--red-dark);
+  transition: color 0.15s ease;
+}
+.scorecard tfoot .handicap-row #handicap-total.under {
+  color: #1f7a3a;
+}
+.scorecard tfoot .handicap-row #handicap-total.over {
+  color: var(--red-dark);
+}
+.scorecard tfoot .handicap-row #handicap-total.even {
+  color: var(--ink);
+}
+
+.handicap-note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
 .scorecard input[type="number"] {
   width: 70px;
   padding: 6px 8px;
