@@ -66,6 +66,53 @@ html, body {
 }
 .muted { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
 
+/* Profile */
+.profile-form { margin-top: 4px; }
+.profile-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red-dark);
+  margin-bottom: 6px;
+}
+.profile-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.profile-row input[type="text"] {
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 15px;
+}
+.profile-row input[type="text"]:focus {
+  outline: none;
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.15);
+}
+.profile-display {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.profile-greeting {
+  margin: 0;
+  font-size: 16px;
+}
+.profile-greeting strong { color: var(--red-dark); }
+.profile-status {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  min-height: 18px;
+}
+
 /* Courses */
 .course-grid {
   display: grid;

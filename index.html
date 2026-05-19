@@ -18,6 +18,35 @@
   </header>
 
   <main class="container">
+    <section class="card profile-card" aria-labelledby="profile-heading">
+      <h2 id="profile-heading">Your profile</h2>
+      <p class="muted">Enter a name once — your saved rounds stay linked to you.</p>
+
+      <form id="profile-form" class="profile-form">
+        <label class="profile-label" for="profile-name">Display name</label>
+        <div class="profile-row">
+          <input
+            type="text"
+            id="profile-name"
+            name="displayName"
+            maxlength="40"
+            placeholder="e.g. Carl"
+            autocomplete="nickname"
+            required
+          />
+          <button type="submit" class="primary-btn">Save profile</button>
+        </div>
+      </form>
+
+      <div id="profile-display" class="profile-display" hidden>
+        <p class="profile-greeting">
+          Playing as <strong id="profile-name-display"></strong>
+        </p>
+        <button type="button" id="profile-edit-btn" class="ghost-btn">Change name</button>
+      </div>
+      <p id="profile-status" class="profile-status" aria-live="polite"></p>
+    </section>
+
     <section class="card" aria-labelledby="course-heading">
       <h2 id="course-heading">1. Choose your course</h2>
       <p class="muted">Each course is a 9-hole map. Hover a card to preview the layout.</p>

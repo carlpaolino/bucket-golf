@@ -50,9 +50,11 @@ const COURSES = [
 const STATE = {
   selectedCourseId: null,
   scores: [],
+  profile: null, // { id, displayName }
 };
 
 const STORAGE_KEY = "bucket-golf-rounds-v1";
+const PROFILE_STORAGE_KEY = "bucket-golf-profile-v1";
 
 /* -------- Supabase client (optional) --------
  *
@@ -61,6 +63,7 @@ const STORAGE_KEY = "bucket-golf-rounds-v1";
  * to localStorage so the app still works with no network.
  */
 const ROUNDS_TABLE = "rounds";
+const PROFILES_TABLE = "profiles";
 
 function makeSupabaseClient() {
   const cfg = window.SUPABASE_CONFIG;
@@ -93,6 +96,106 @@ function updateStorageBadge() {
     badge.textContent = "Local only";
     badge.classList.remove("synced");
   }
+}
+
+/* -------- Profile -------- */
+
+function newProfileId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return "p_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
+function readStoredProfile() {
+  try {
+    const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredProfile(profile) {
+  localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+}
+
+function getActiveProfile() {
+  const p = STATE.profile;
+  if (!p || !p.id) return null;
+  const name = (p.displayName || "").trim();
+  if (!name) return null;
+  return { id: p.id, displayName: name };
+}
+
+function loadProfileFromStorage() {
+  const stored = readStoredProfile();
+  STATE.profile = stored && stored.id
+    ? { id: stored.id, displayName: stored.displayName || "" }
+    : { id: newProfileId(), displayName: "" };
+  if (!stored) writeStoredProfile(STATE.profile);
+}
+
+function setProfileStatus(msg, isError = false) {
+  const el = document.getElementById("profile-status");
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? "var(--red-dark)" : "var(--muted)";
+}
+
+function renderProfileUI() {
+  const profile = getActiveProfile();
+  const form = document.getElementById("profile-form");
+  const display = document.getElementById("profile-display");
+  const nameInput = document.getElementById("profile-name");
+  const nameDisplay = document.getElementById("profile-name-display");
+
+  if (!form || !display) return;
+
+  if (profile) {
+    form.hidden = true;
+    display.hidden = false;
+    if (nameDisplay) nameDisplay.textContent = profile.displayName;
+  } else {
+    form.hidden = false;
+    display.hidden = true;
+    if (nameInput) nameInput.value = STATE.profile.displayName || "";
+    nameInput?.focus();
+  }
+}
+
+async function saveProfile(displayName) {
+  const trimmed = displayName.trim();
+  if (!trimmed) {
+    setProfileStatus("Please enter a name.", true);
+    return { ok: false };
+  }
+
+  if (!STATE.profile?.id) {
+    STATE.profile = { id: newProfileId(), displayName: trimmed };
+  } else {
+    STATE.profile.displayName = trimmed;
+  }
+  writeStoredProfile(STATE.profile);
+
+  if (USING_SUPABASE) {
+    const { error } = await SB.from(PROFILES_TABLE).upsert({
+      id: STATE.profile.id,
+      display_name: trimmed,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) {
+      setProfileStatus("Could not sync profile: " + error.message, true);
+      return { ok: false, error };
+    }
+    setProfileStatus("Profile saved and synced.");
+  } else {
+    setProfileStatus("Profile saved on this device.");
+  }
+
+  renderProfileUI();
+  await renderRounds();
+  return { ok: true };
 }
 
 /* -------- Course list -------- */
@@ -350,6 +453,7 @@ function writeLocalRounds(rounds) {
 function rowToRound(row) {
   return {
     id: row.id,
+    profileId: row.profile_id,
     courseId: row.course_id,
     scores: row.scores,
     total: row.total,
@@ -360,6 +464,7 @@ function rowToRound(row) {
 function roundToRow(round) {
   return {
     id: round.id,
+    profile_id: round.profileId,
     course_id: round.courseId,
     scores: round.scores,
     total: round.total,
@@ -367,18 +472,32 @@ function roundToRow(round) {
   };
 }
 
+function roundsForActiveProfile(rounds) {
+  const profile = getActiveProfile();
+  if (!profile) return [];
+  return rounds.filter(
+    (r) => !r.profileId || r.profileId === profile.id
+  );
+}
+
 async function loadRounds() {
-  if (!USING_SUPABASE) return readLocalRounds();
+  const profile = getActiveProfile();
+  if (!profile) return [];
+
+  if (!USING_SUPABASE) {
+    return roundsForActiveProfile(readLocalRounds());
+  }
+
   const { data, error } = await SB
     .from(ROUNDS_TABLE)
     .select("*")
+    .eq("profile_id", profile.id)
     .order("played_at", { ascending: true });
   if (error) {
     console.warn("Supabase load failed, using local cache:", error.message);
-    return readLocalRounds();
+    return roundsForActiveProfile(readLocalRounds());
   }
   const rounds = data.map(rowToRound);
-  // Keep a local cache so the list still shows up when offline.
   writeLocalRounds(rounds);
   return rounds;
 }
@@ -393,7 +512,6 @@ async function saveRound(round) {
   const { error } = await SB.from(ROUNDS_TABLE).insert(roundToRow(round));
   if (error) return { ok: false, error };
 
-  // Mirror to localStorage so the cache stays warm.
   const cached = readLocalRounds();
   cached.push(round);
   writeLocalRounds(cached);
@@ -401,11 +519,19 @@ async function saveRound(round) {
 }
 
 async function deleteRound(id) {
+  const profile = getActiveProfile();
+  if (!profile) return { ok: false, error: { message: "No profile" } };
+
   if (!USING_SUPABASE) {
     writeLocalRounds(readLocalRounds().filter((r) => r.id !== id));
     return { ok: true };
   }
-  const { error } = await SB.from(ROUNDS_TABLE).delete().eq("id", id);
+
+  const { error } = await SB
+    .from(ROUNDS_TABLE)
+    .delete()
+    .eq("id", id)
+    .eq("profile_id", profile.id);
   if (error) return { ok: false, error };
   writeLocalRounds(readLocalRounds().filter((r) => r.id !== id));
   return { ok: true };
@@ -413,6 +539,13 @@ async function deleteRound(id) {
 
 async function renderRounds() {
   const list = document.getElementById("rounds-list");
+  if (!list) return;
+
+  if (!getActiveProfile()) {
+    list.innerHTML = `<li class="muted">Set up your profile above to save rounds.</li>`;
+    return;
+  }
+
   list.innerHTML = `<li class="muted">Loading…</li>`;
 
   const rounds = await loadRounds();
@@ -481,10 +614,34 @@ function currentCourse() {
 /* -------- Init -------- */
 
 function init() {
+  loadProfileFromStorage();
+  renderProfileUI();
   renderCourses();
   updateStorageBadge();
   renderRounds();
   updateHandicap();
+
+  document.getElementById("profile-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("profile-name");
+    const btn = e.target.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+    await saveProfile(input?.value || "");
+    if (btn) btn.disabled = false;
+  });
+
+  document.getElementById("profile-edit-btn")?.addEventListener("click", () => {
+    const form = document.getElementById("profile-form");
+    const display = document.getElementById("profile-display");
+    const input = document.getElementById("profile-name");
+    if (form) form.hidden = false;
+    if (display) display.hidden = true;
+    if (input) {
+      input.value = STATE.profile?.displayName || "";
+      input.focus();
+    }
+    setProfileStatus("");
+  });
 
   document.getElementById("file-input").addEventListener("change", (e) => {
     const file = e.target.files && e.target.files[0];
@@ -501,6 +658,12 @@ function init() {
 
   document.getElementById("score-form").addEventListener("submit", async (e) => {
     e.preventDefault();
+    const profile = getActiveProfile();
+    if (!profile) {
+      setUploadStatus("Set up your profile first (name at the top).", true);
+      document.getElementById("profile-name")?.focus();
+      return;
+    }
     const course = currentCourse();
     if (!course) {
       setUploadStatus("Choose a course first.", true);
@@ -515,6 +678,7 @@ function init() {
     const total = scores.reduce((a, b) => a + b, 0);
     const round = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      profileId: profile.id,
       courseId: course.id,
       scores,
       total,

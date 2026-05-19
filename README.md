@@ -13,6 +13,8 @@ Built with vanilla HTML / CSS / JavaScript — no build step required.
 - Manual score entry per hole with live total + par comparison.
 - Upload a CSV / TXT scorecard (any whitespace- or comma-separated list of 9
   numbers) to auto-fill scores.
+- **Simple profile** — enter a name once; every round is stored under your
+  profile id (synced to Supabase when configured).
 - Rounds persist to **Supabase** when configured, with a `localStorage`
   fallback so the app still works offline.
 - Red & white theme.
@@ -36,6 +38,8 @@ To sync rounds to a real database, follow the Supabase setup below.
 - `styles.css` — red & white theme
 - `script.js` — courses, score logic, persistence
 - `config.example.js` — Supabase config template (copy to `config.js`)
+- `supabase/schema.sql` — full database schema (profiles + rounds)
+- `supabase/migrate-profiles.sql` — upgrade script if you already have `rounds`
 
 ## CSV format
 
@@ -60,28 +64,18 @@ app reads and writes.
    region closest to you.
 4. Click **Create new project** and wait ~1 minute for it to provision.
 
-### 2. Create the `rounds` table
+### 2. Create the database tables
 
 1. In the left sidebar, open **SQL Editor** → **New query**.
-2. Paste the SQL below and click **Run**.
+2. Paste the contents of [`supabase/schema.sql`](supabase/schema.sql) and click **Run**.
 
-```sql
-create table public.rounds (
-  id          text        primary key,
-  course_id   text        not null,
-  scores      integer[]   not null,
-  total       integer     not null,
-  played_at   timestamptz not null default now()
-);
+That creates `profiles` and `rounds` (with `profile_id` foreign key), indexes,
+and demo Row Level Security policies.
 
-alter table public.rounds enable row level security;
-
--- Demo policies: anyone with the anon key can read / write / delete rounds.
--- Tighten these (e.g. require auth.uid()) before going public.
-create policy "rounds_read"   on public.rounds for select to anon using (true);
-create policy "rounds_insert" on public.rounds for insert to anon with check (true);
-create policy "rounds_delete" on public.rounds for delete to anon using (true);
-```
+**Already have an older `rounds` table?** Run
+[`supabase/migrate-profiles.sql`](supabase/migrate-profiles.sql) instead. Existing
+rows without a `profile_id` will not show until you delete them or backfill a
+profile id.
 
 ### 3. Grab your project URL + anon key
 
