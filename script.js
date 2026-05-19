@@ -5,6 +5,7 @@ const COURSES = [
     id: "backyard-classic",
     name: "Backyard Classic",
     description: "Wide open lawn — beginner friendly.",
+    difficulty: 2, // 1 = easy, 2 = normal, 3 = hard (edit per course)
     pars: [3, 3, 4, 3, 4, 3, 3, 4, 3],
     holes: [
       { x: 60, y: 220 }, { x: 130, y: 160 }, { x: 200, y: 220 },
@@ -16,6 +17,7 @@ const COURSES = [
     id: "park-loop",
     name: "Park Loop",
     description: "A balanced loop through the trees.",
+    difficulty: 2,
     pars: [4, 3, 4, 4, 3, 5, 3, 4, 4],
     holes: [
       { x: 80, y: 200 }, { x: 160, y: 110 }, { x: 240, y: 200 },
@@ -27,6 +29,7 @@ const COURSES = [
     id: "beach-bash",
     name: "Beach Bash",
     description: "Sandy lies and ocean breeze.",
+    difficulty: 2,
     pars: [3, 4, 3, 4, 5, 3, 4, 3, 4],
     holes: [
       { x: 60, y: 240 }, { x: 140, y: 180 }, { x: 220, y: 240 },
@@ -38,6 +41,7 @@ const COURSES = [
     id: "mountain-9",
     name: "Mountain Nine",
     description: "Steep elevation, tricky greens.",
+    difficulty: 2,
     pars: [4, 4, 5, 3, 4, 5, 3, 4, 5],
     holes: [
       { x: 80, y: 250 }, { x: 160, y: 200 }, { x: 240, y: 150 },
@@ -286,6 +290,30 @@ async function selectPlayer(displayName) {
   updateStorageBadge();
   await renderRounds();
   updateHandicap();
+  updatePlayerHandicapSummary();
+}
+
+async function updatePlayerHandicapSummary() {
+  const el = document.getElementById("player-handicap-summary");
+  if (!el) return;
+  const profile = getActiveProfile();
+  if (!profile) {
+    el.textContent = "";
+    return;
+  }
+  const rounds = await loadRounds();
+  const hcap = computeSimpleHandicap(rounds);
+  if (hcap.handicap == null) {
+    const need = Math.max(0, 3 - rounds.length);
+    el.textContent =
+      rounds.length === 0
+        ? ""
+        : need > 0
+          ? `Handicap: play ${need} more round${need === 1 ? "" : "s"} to qualify.`
+          : "";
+    return;
+  }
+  el.textContent = `Handicap: ${formatHandicap(hcap.handicap)} (best of each 3 rounds · ${hcap.setsUsed} set${hcap.setsUsed === 1 ? "" : "s"})`;
 }
 
 function switchPlayer() {
@@ -346,9 +374,10 @@ function renderCourses() {
     card.setAttribute("role", "radio");
     card.setAttribute("aria-checked", "false");
     card.dataset.courseId = course.id;
+    const diff = Math.min(3, Math.max(1, Number(course.difficulty) || 2));
     card.innerHTML = `
       <span class="name">${course.name}</span>
-      <span class="meta">9 holes · Par ${par}</span>
+      <span class="meta">9 holes · Par ${par} · Difficulty ${diff}/3</span>
       <span class="meta">${course.description}</span>
     `;
     card.addEventListener("click", () => selectCourse(course.id));
@@ -519,6 +548,51 @@ function formatHandicap(diff) {
   const n = Math.round(diff * 10) / 10;
   if (n === 0) return "E";
   return n > 0 ? `+${n}` : `${String(n)}`;
+}
+
+/* -------- Simple handicap (best 1 of each 3 rounds) --------
+ *
+ * Per round: adjusted score vs par, with course difficulty 1–3
+ * (1 = easy, 2 = normal, 3 = hard). Harder courses add strokes to the diff.
+ *
+ * Handicap = average of the best adjusted diff from each complete block of
+ * 3 rounds (oldest → newest). Need at least 3 rounds for one value.
+ */
+function coursePar(course) {
+  return course.pars.reduce((a, b) => a + b, 0);
+}
+
+function roundAdjustedDiff(round) {
+  const course = COURSES.find((c) => c.id === round.courseId);
+  if (!course) return null;
+  const par = coursePar(course);
+  const difficulty = Math.min(3, Math.max(1, Number(course.difficulty) || 2));
+  const raw = round.total - par;
+  return raw + (difficulty - 2);
+}
+
+function computeSimpleHandicap(rounds) {
+  const sorted = [...rounds].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+  const diffs = sorted.map(roundAdjustedDiff).filter((d) => d !== null);
+
+  const bests = [];
+  for (let i = 0; i + 3 <= diffs.length; i += 3) {
+    const chunk = diffs.slice(i, i + 3);
+    bests.push(Math.min(...chunk));
+  }
+
+  if (bests.length === 0) {
+    return { handicap: null, setsUsed: 0, roundsUsed: diffs.length };
+  }
+
+  const handicap = bests.reduce((sum, d) => sum + d, 0) / bests.length;
+  return {
+    handicap,
+    setsUsed: bests.length,
+    roundsUsed: bests.length * 3,
+  };
 }
 
 /* -------- File upload -------- */
@@ -786,6 +860,7 @@ async function renderRounds() {
       }
       if (STATE.editingRoundId === id) clearEditMode();
       await renderRounds();
+      updatePlayerHandicapSummary();
       if (STATE.activeTab === "leaderboard") await renderLeaderboard();
     });
   });
@@ -797,27 +872,19 @@ function buildLeaderboardRows(allRounds) {
   for (const round of allRounds) {
     const pid = round.profileId;
     if (!pid) continue;
-    const course = COURSES.find((c) => c.id === round.courseId);
-    if (!course) continue;
-    const par = course.pars.reduce((a, b) => a + b, 0);
-    const diff = round.total - par;
-    if (!byProfile.has(pid)) {
-      byProfile.set(pid, { diffs: [], rounds: 0 });
-    }
-    const entry = byProfile.get(pid);
-    entry.diffs.push(diff);
-    entry.rounds += 1;
+    if (!byProfile.has(pid)) byProfile.set(pid, []);
+    byProfile.get(pid).push(round);
   }
 
   const rows = [];
-  for (const [profileId, data] of byProfile) {
-    const avg =
-      data.diffs.reduce((sum, d) => sum + d, 0) / data.diffs.length;
+  for (const [profileId, playerRounds] of byProfile) {
+    const hcap = computeSimpleHandicap(playerRounds);
     rows.push({
       profileId,
       name: displayNameForProfileId(profileId),
-      roundsPlayed: data.rounds,
-      avgHandicap: avg,
+      roundsPlayed: playerRounds.length,
+      handicap: hcap.handicap,
+      setsUsed: hcap.setsUsed,
     });
   }
 
@@ -828,18 +895,21 @@ function buildLeaderboardRows(allRounds) {
         profileId: id,
         name,
         roundsPlayed: 0,
-        avgHandicap: null,
+        handicap: null,
+        setsUsed: 0,
       });
     }
   }
 
   rows.sort((a, b) => {
-    if (a.roundsPlayed === 0 && b.roundsPlayed === 0) {
+    const aHas = a.handicap != null;
+    const bHas = b.handicap != null;
+    if (!aHas && !bHas) {
       return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     }
-    if (a.roundsPlayed === 0) return 1;
-    if (b.roundsPlayed === 0) return -1;
-    if (a.avgHandicap !== b.avgHandicap) return a.avgHandicap - b.avgHandicap;
+    if (!aHas) return 1;
+    if (!bHas) return -1;
+    if (a.handicap !== b.handicap) return a.handicap - b.handicap;
     return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
   });
 
@@ -867,7 +937,7 @@ async function renderLeaderboard() {
           <th>#</th>
           <th>Player</th>
           <th>Rounds</th>
-          <th>Avg vs par</th>
+          <th>Handicap</th>
         </tr>
       </thead>
       <tbody>
@@ -875,13 +945,20 @@ async function renderLeaderboard() {
 
   let rankNum = 0;
   rows.forEach((row) => {
-    const rank = row.roundsPlayed > 0 ? ++rankNum : "—";
-    const hcap = row.avgHandicap == null ? "—" : formatHandicap(row.avgHandicap);
+    const rank = row.handicap != null ? ++rankNum : "—";
+    const hcap =
+      row.handicap == null
+        ? row.roundsPlayed > 0 && row.roundsPlayed < 3
+          ? `Need ${3 - row.roundsPlayed} more`
+          : "—"
+        : formatHandicap(row.handicap);
     const you = row.profileId === activeId ? ' class="leaderboard-you"' : "";
+    const setsNote =
+      row.setsUsed > 0 ? `<span class="leaderboard-sets">${row.setsUsed}× best-of-3</span>` : "";
     html += `
       <tr${you}>
         <td>${rank}</td>
-        <td>${escapeHtml(row.name)}</td>
+        <td>${escapeHtml(row.name)}${setsNote}</td>
         <td>${row.roundsPlayed}</td>
         <td>${hcap}</td>
       </tr>
@@ -1028,6 +1105,7 @@ async function init() {
 
     prepareNewRoundAfterSave();
     await renderRounds();
+    updatePlayerHandicapSummary();
     if (STATE.activeTab === "leaderboard") await renderLeaderboard();
 
     const par = course.pars.reduce((a, b) => a + b, 0);
