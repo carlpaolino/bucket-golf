@@ -54,6 +54,47 @@ const STATE = {
 
 const STORAGE_KEY = "bucket-golf-rounds-v1";
 
+/* -------- Supabase client (optional) --------
+ *
+ * If `config.js` defines a real Supabase URL + anon key, every save / delete /
+ * load goes through the `rounds` table on that project. Otherwise we fall back
+ * to localStorage so the app still works with no network.
+ */
+const ROUNDS_TABLE = "rounds";
+
+function makeSupabaseClient() {
+  const cfg = window.SUPABASE_CONFIG;
+  if (!cfg || !cfg.url || !cfg.anonKey) return null;
+  if (cfg.url.includes("YOUR-PROJECT-REF") || cfg.anonKey.includes("YOUR-PUBLIC")) {
+    return null;
+  }
+  if (!window.supabase || typeof window.supabase.createClient !== "function") {
+    console.warn("Supabase JS SDK failed to load; falling back to localStorage.");
+    return null;
+  }
+  try {
+    return window.supabase.createClient(cfg.url, cfg.anonKey);
+  } catch (err) {
+    console.warn("Could not init Supabase client:", err);
+    return null;
+  }
+}
+
+const SB = makeSupabaseClient();
+const USING_SUPABASE = SB !== null;
+
+function updateStorageBadge() {
+  const badge = document.getElementById("storage-badge");
+  if (!badge) return;
+  if (USING_SUPABASE) {
+    badge.textContent = "Synced to Supabase";
+    badge.classList.add("synced");
+  } else {
+    badge.textContent = "Local only";
+    badge.classList.remove("synced");
+  }
+}
+
 /* -------- Course list -------- */
 
 function renderCourses() {
@@ -232,7 +273,7 @@ async function handleFile(file) {
 
 /* -------- Saved rounds -------- */
 
-function loadRounds() {
+function readLocalRounds() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -241,13 +282,80 @@ function loadRounds() {
   }
 }
 
-function saveRounds(rounds) {
+function writeLocalRounds(rounds) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(rounds));
 }
 
-function renderRounds() {
+// Normalize a Supabase row to the shape the UI uses everywhere else.
+function rowToRound(row) {
+  return {
+    id: row.id,
+    courseId: row.course_id,
+    scores: row.scores,
+    total: row.total,
+    date: row.played_at,
+  };
+}
+
+function roundToRow(round) {
+  return {
+    id: round.id,
+    course_id: round.courseId,
+    scores: round.scores,
+    total: round.total,
+    played_at: round.date,
+  };
+}
+
+async function loadRounds() {
+  if (!USING_SUPABASE) return readLocalRounds();
+  const { data, error } = await SB
+    .from(ROUNDS_TABLE)
+    .select("*")
+    .order("played_at", { ascending: true });
+  if (error) {
+    console.warn("Supabase load failed, using local cache:", error.message);
+    return readLocalRounds();
+  }
+  const rounds = data.map(rowToRound);
+  // Keep a local cache so the list still shows up when offline.
+  writeLocalRounds(rounds);
+  return rounds;
+}
+
+async function saveRound(round) {
+  if (!USING_SUPABASE) {
+    const rounds = readLocalRounds();
+    rounds.push(round);
+    writeLocalRounds(rounds);
+    return { ok: true };
+  }
+  const { error } = await SB.from(ROUNDS_TABLE).insert(roundToRow(round));
+  if (error) return { ok: false, error };
+
+  // Mirror to localStorage so the cache stays warm.
+  const cached = readLocalRounds();
+  cached.push(round);
+  writeLocalRounds(cached);
+  return { ok: true };
+}
+
+async function deleteRound(id) {
+  if (!USING_SUPABASE) {
+    writeLocalRounds(readLocalRounds().filter((r) => r.id !== id));
+    return { ok: true };
+  }
+  const { error } = await SB.from(ROUNDS_TABLE).delete().eq("id", id);
+  if (error) return { ok: false, error };
+  writeLocalRounds(readLocalRounds().filter((r) => r.id !== id));
+  return { ok: true };
+}
+
+async function renderRounds() {
   const list = document.getElementById("rounds-list");
-  const rounds = loadRounds();
+  list.innerHTML = `<li class="muted">Loading…</li>`;
+
+  const rounds = await loadRounds();
   list.innerHTML = "";
 
   if (rounds.length === 0) {
@@ -279,11 +387,16 @@ function renderRounds() {
     });
 
   list.querySelectorAll(".round-delete").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
-      const remaining = loadRounds().filter((r) => r.id !== id);
-      saveRounds(remaining);
-      renderRounds();
+      btn.disabled = true;
+      const result = await deleteRound(id);
+      if (!result.ok) {
+        setUploadStatus("Could not delete round: " + result.error.message, true);
+        btn.disabled = false;
+        return;
+      }
+      await renderRounds();
     });
   });
 }
@@ -309,6 +422,7 @@ function currentCourse() {
 
 function init() {
   renderCourses();
+  updateStorageBadge();
   renderRounds();
 
   document.getElementById("file-input").addEventListener("change", (e) => {
@@ -324,7 +438,7 @@ function init() {
     setUploadStatus("");
   });
 
-  document.getElementById("score-form").addEventListener("submit", (e) => {
+  document.getElementById("score-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const course = currentCourse();
     if (!course) {
@@ -345,11 +459,25 @@ function init() {
       total,
       date: new Date().toISOString(),
     };
-    const rounds = loadRounds();
-    rounds.push(round);
-    saveRounds(rounds);
-    renderRounds();
-    setUploadStatus(`Round saved! Total: ${total}.`);
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    setUploadStatus(USING_SUPABASE ? "Saving to Supabase…" : "Saving locally…");
+
+    const result = await saveRound(round);
+    if (submitBtn) submitBtn.disabled = false;
+
+    if (!result.ok) {
+      setUploadStatus("Could not save round: " + result.error.message, true);
+      return;
+    }
+
+    await renderRounds();
+    setUploadStatus(
+      USING_SUPABASE
+        ? `Round saved to Supabase! Total: ${total}.`
+        : `Round saved locally. Total: ${total}. (Set up Supabase to sync across devices.)`
+    );
   });
 }
 
