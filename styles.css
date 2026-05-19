@@ -248,6 +248,30 @@ html, body {
 }
 
 /* Rounds */
+.rounds-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.rounds-header h2 { margin: 0; }
+.storage-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--red-soft);
+  color: var(--red-dark);
+  border: 1px solid var(--line);
+}
+.storage-badge.synced {
+  background: #e6f7ec;
+  color: #1f7a3d;
+  border-color: #c6ebd2;
+}
+
 .rounds-list {
   list-style: none;
   margin: 0;

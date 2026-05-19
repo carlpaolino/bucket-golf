@@ -1,0 +1,7 @@
+# Local Supabase credentials — never commit these
+config.js
+
+# OS / editor noise
+.DS_Store
+.vscode/
+.idea/

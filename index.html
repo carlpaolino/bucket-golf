@@ -78,7 +78,10 @@
     </section>
 
     <section class="card" aria-labelledby="rounds-heading">
-      <h2 id="rounds-heading">Saved rounds</h2>
+      <div class="rounds-header">
+        <h2 id="rounds-heading">Saved rounds</h2>
+        <span id="storage-badge" class="storage-badge" aria-live="polite">Local only</span>
+      </div>
       <ul id="rounds-list" class="rounds-list">
         <li class="muted">No rounds saved yet.</li>
       </ul>
@@ -89,6 +92,8 @@
     <p>Built with ⛳ for Bucket Golf</p>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="config.js" onerror="window.__noConfig=true"></script>
   <script src="script.js"></script>
 </body>
 </html>
