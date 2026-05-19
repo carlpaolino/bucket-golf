@@ -315,7 +315,7 @@ html, body {
   border: 1px dashed var(--line);
   border-radius: 12px;
   padding: 16px;
-  min-height: 260px;
+  min-height: 300px;
   background: #fffafb;
 }
 .map-empty {
@@ -529,12 +529,25 @@ html, body {
   padding: 16px 12px 32px;
 }
 
-/* Map SVG styling */
-.hole-marker { fill: var(--red); }
-.hole-label { fill: var(--white); font-size: 10px; font-weight: 700; }
-.fairway { stroke: var(--red); stroke-width: 2; fill: none; stroke-dasharray: 4 4; opacity: 0.6; }
-.tee { fill: var(--red-dark); }
-.green { fill: var(--red); opacity: 0.2; stroke: var(--red); stroke-width: 1.5; }
+/* Map SVG styling — aerial template: grass | water | grass */
+.map-wave {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.4);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.map-holes { pointer-events: none; }
+.map-terrain-edge {
+  stroke: #2d5a24;
+  stroke-width: 2;
+  opacity: 0.35;
+}
+.map-bunker {
+  fill: #c9a060;
+  stroke: #a88448;
+  stroke-width: 1.5;
+  fill-rule: nonzero;
+}
 
 @media (max-width: 600px) {
   .hero h1 { font-size: 28px; }

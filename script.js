@@ -7,11 +7,7 @@ const COURSES = [
     description: "Wide open lawn — beginner friendly.",
     difficulty: 2, // 1 = easy, 2 = normal, 3 = hard (edit per course)
     pars: [3, 3, 4, 3, 4, 3, 3, 4, 3],
-    holes: [
-      { x: 60, y: 220 }, { x: 130, y: 160 }, { x: 200, y: 220 },
-      { x: 270, y: 140 }, { x: 340, y: 220 }, { x: 410, y: 150 },
-      { x: 480, y: 230 }, { x: 540, y: 160 }, { x: 600, y: 220 },
-    ],
+    // holeDesign: optional SVG string overlaid on the shared map template
   },
   {
     id: "park-loop",
@@ -19,11 +15,6 @@ const COURSES = [
     description: "A balanced loop through the trees.",
     difficulty: 2,
     pars: [4, 3, 4, 4, 3, 5, 3, 4, 4],
-    holes: [
-      { x: 80, y: 200 }, { x: 160, y: 110 }, { x: 240, y: 200 },
-      { x: 320, y: 90 },  { x: 400, y: 200 }, { x: 480, y: 110 },
-      { x: 560, y: 200 }, { x: 480, y: 260 }, { x: 320, y: 260 },
-    ],
   },
   {
     id: "beach-bash",
@@ -31,11 +22,6 @@ const COURSES = [
     description: "Sandy lies and ocean breeze.",
     difficulty: 2,
     pars: [3, 4, 3, 4, 5, 3, 4, 3, 4],
-    holes: [
-      { x: 60, y: 240 }, { x: 140, y: 180 }, { x: 220, y: 240 },
-      { x: 300, y: 160 }, { x: 380, y: 240 }, { x: 460, y: 160 },
-      { x: 540, y: 240 }, { x: 600, y: 170 }, { x: 640, y: 240 },
-    ],
   },
   {
     id: "mountain-9",
@@ -43,13 +29,16 @@ const COURSES = [
     description: "Steep elevation, tricky greens.",
     difficulty: 2,
     pars: [4, 4, 5, 3, 4, 5, 3, 4, 5],
-    holes: [
-      { x: 80, y: 250 }, { x: 160, y: 200 }, { x: 240, y: 150 },
-      { x: 320, y: 110 }, { x: 400, y: 150 }, { x: 480, y: 110 },
-      { x: 560, y: 150 }, { x: 600, y: 210 }, { x: 640, y: 260 },
-    ],
   },
 ];
+
+/** Shared aerial map: grass | water | grass (top 2/3), house from above (bottom 1/3). */
+const MAP_LAYOUT = {
+  width: 700,
+  height: 420,
+  grassWidth: 210,
+  terrainRatio: 2 / 3,
+};
 
 const STATE = {
   selectedCourseId: null,
@@ -402,6 +391,128 @@ function selectCourse(courseId) {
 
 /* -------- Map -------- */
 
+/** Tan bunker: in grass only, curves outward away from the water toward the screen edge. */
+function renderBunkers(terrainH, gw, grassRightX, w, h) {
+  const attrs = 'fill="#c9a060" stroke="none"';
+  const span = Math.round((terrainH - Math.round(terrainH * 0.42)) * 0.5);
+  const topY = terrainH - span;
+  const bulge = 22;
+  const grassEdgeL = gw - 4;
+  const grassEdgeR = grassRightX + 4;
+  const sideGrassW = gw / 2;
+  const minX = sideGrassW + 8;
+  const maxX = w - sideGrassW - 8;
+
+  const leftBunker = [
+    `M ${grassEdgeL} ${topY}`,
+    `L ${grassEdgeL} ${terrainH}`,
+    `C ${grassEdgeL - bulge} ${terrainH} ${minX + 10} ${terrainH + 6} ${minX} ${terrainH + 14}`,
+    `C ${minX + 16} ${topY + 23} ${grassEdgeL - 8} ${topY + 7} ${grassEdgeL} ${topY}`,
+    "Z",
+  ].join(" ");
+
+  const rightBunker = [
+    `M ${grassEdgeR} ${topY}`,
+    `L ${grassEdgeR} ${terrainH}`,
+    `C ${grassEdgeR + bulge} ${terrainH} ${maxX - 10} ${terrainH + 6} ${maxX} ${terrainH + 14}`,
+    `C ${maxX - 16} ${topY + 23} ${grassEdgeR + 8} ${topY + 7} ${grassEdgeR} ${topY}`,
+    "Z",
+  ].join(" ");
+
+  return `
+    <g class="map-bunkers" aria-hidden="true">
+      <clipPath id="map-bunker-left-clip"><rect x="0" y="0" width="${gw}" height="${h}" /></clipPath>
+      <clipPath id="map-bunker-right-clip"><rect x="${grassRightX}" y="0" width="${gw}" height="${h}" /></clipPath>
+      <path ${attrs} clip-path="url(#map-bunker-left-clip)" d="${leftBunker}" />
+      <path ${attrs} clip-path="url(#map-bunker-right-clip)" d="${rightBunker}" />
+    </g>
+  `;
+}
+
+function renderMapTerrain(w, terrainH, gw) {
+  const waterX = gw;
+  const waterW = w - gw * 2;
+  const grassRightX = gw + waterW;
+
+  const waves = [];
+  for (let y = 20; y < terrainH; y += 26) {
+    const amp = y % 52 === 20 ? 7 : 5;
+    waves.push(
+      `<path class="map-wave" d="M ${waterX} ${y} q ${waterW * 0.14} ${-amp} ${waterW * 0.28} 0 t ${waterW * 0.28} 0 t ${waterW * 0.28} 0" />`
+    );
+  }
+
+  return `
+    <rect fill="url(#map-grass-grad)" x="0" y="0" width="${gw}" height="${terrainH}" />
+    <rect fill="url(#map-grass-grad)" x="${grassRightX}" y="0" width="${gw}" height="${terrainH}" />
+    <rect fill="url(#map-water-grad)" x="${waterX}" y="0" width="${waterW}" height="${terrainH}" />
+    <g clip-path="url(#map-water-clip)" aria-hidden="true">
+      ${waves.join("")}
+    </g>
+    <line class="map-terrain-edge" x1="0" y1="${terrainH}" x2="${w}" y2="${terrainH}" />
+  `;
+}
+
+/** Single gable roof seen from directly above (dark grey, ridge down the center). */
+function renderAerialRoof(cx, roofY, roofW, roofH) {
+  const roofX = cx - roofW / 2;
+  return `
+    <rect fill="#4a4d52" x="${roofX}" y="${roofY}" width="${roofW}" height="${roofH}" rx="3" />
+    <rect fill="#2e3136" x="${roofX}" y="${roofY}" width="${roofW / 2}" height="${roofH}" rx="3" />
+    <line x1="${cx}" y1="${roofY}" x2="${cx}" y2="${roofY + roofH}" stroke="#1a1c1f" stroke-width="2.5" />
+  `;
+}
+
+/** Bottom third: grey yard + center roof; extra grass on far left and right. */
+function renderMapHouse(w, h, terrainH, gw) {
+  const zoneH = h - terrainH;
+  const houseY = terrainH;
+  const roofW = 158;
+  const roofH = 78;
+  const roofY = houseY + zoneH * 0.32;
+  const sideGrassW = gw / 2;
+
+  return `
+    <g class="map-house-zone" aria-hidden="true">
+      <rect fill="#a8abb0" x="0" y="${houseY}" width="${w}" height="${zoneH}" />
+      <rect fill="url(#map-grass-grad)" x="0" y="${houseY}" width="${sideGrassW}" height="${zoneH}" />
+      <rect fill="url(#map-grass-grad)" x="${w - sideGrassW}" y="${houseY}" width="${sideGrassW}" height="${zoneH}" />
+      <rect fill="#7a7e85" x="${w / 2 - 32}" y="${houseY + 10}" width="64" height="${zoneH - 14}" rx="2" />
+      ${renderAerialRoof(w / 2, roofY, roofW, roofH)}
+    </g>
+  `;
+}
+
+function renderMapTemplate() {
+  const { width: w, height: h, grassWidth: gw, terrainRatio } = MAP_LAYOUT;
+  const terrainH = Math.round(h * terrainRatio);
+  const grassRightX = gw + (w - gw * 2);
+
+  return `
+    <defs>
+      <linearGradient id="map-grass-grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#6aab52" />
+        <stop offset="100%" stop-color="#3d7a32" />
+      </linearGradient>
+      <linearGradient id="map-water-grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#6ec4f0" />
+        <stop offset="100%" stop-color="#2a7ab8" />
+      </linearGradient>
+      <clipPath id="map-water-clip">
+        <rect x="${gw}" y="0" width="${w - gw * 2}" height="${terrainH}" />
+      </clipPath>
+    </defs>
+    ${renderMapTerrain(w, terrainH, gw)}
+    ${renderMapHouse(w, h, terrainH, gw)}
+    ${renderBunkers(terrainH, gw, grassRightX, w, h)}
+  `;
+}
+
+/** Per-course hole art — set course.holeDesign to an SVG fragment when ready. */
+function renderMapHoleOverlays(course) {
+  return course.holeDesign || "";
+}
+
 function renderMap() {
   const mapEl = document.getElementById("course-map");
   const course = currentCourse();
@@ -410,29 +521,12 @@ function renderMap() {
     return;
   }
 
-  const w = 700;
-  const h = 320;
-  const points = course.holes
-    .map((p) => `${p.x},${p.y}`)
-    .join(" ");
-
-  const holesMarkup = course.holes
-    .map((p, i) => {
-      return `
-        <g>
-          <circle class="green" cx="${p.x}" cy="${p.y}" r="18" />
-          <circle class="hole-marker" cx="${p.x}" cy="${p.y}" r="11" />
-          <text class="hole-label" x="${p.x}" y="${p.y + 3}" text-anchor="middle">${i + 1}</text>
-        </g>
-      `;
-    })
-    .join("");
+  const { width: w, height: h } = MAP_LAYOUT;
 
   mapEl.innerHTML = `
-    <svg class="map-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="${course.name} course map">
-      <rect x="0" y="0" width="${w}" height="${h}" fill="#fff" />
-      <polyline class="fairway" points="${points}" />
-      ${holesMarkup}
+    <svg class="map-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="${course.name} aerial course map">
+      ${renderMapTemplate()}
+      <g class="map-holes">${renderMapHoleOverlays(course)}</g>
     </svg>
     <p class="muted" style="text-align:center; margin-top: 10px;">
       <strong>${course.name}</strong> — ${course.description}
