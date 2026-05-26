@@ -404,6 +404,9 @@ html, body {
   font-size: 13px;
   color: var(--muted);
 }
+.handicap-note + .handicap-note {
+  margin-top: 6px;
+}
 .scorecard input[type="number"] {
   width: 70px;
   padding: 6px 8px;

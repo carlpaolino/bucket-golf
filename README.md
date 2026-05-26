@@ -17,7 +17,7 @@ Built with vanilla HTML / CSS / JavaScript — no build step required.
   the golf app appears after you pick who’s playing.
 - Rounds persist to **Supabase** when configured, with a `localStorage`
   fallback so the app still works offline.
-- **Simple handicap** on the leaderboard: each course has **difficulty 1–3**; handicap uses the **best round from each group of 3** (difficulty-adjusted), averaged.
+- **Handicap** on the leaderboard: each course has **difficulty 1–3**; handicap is the **average of your best 2 rounds from your last 3** (difficulty-adjusted).
 - Red & white theme.
 
 ### Course difficulty (for handicap)
@@ -33,11 +33,11 @@ In `script.js`, each course has a `difficulty` field (`1` = easy, `2` = normal, 
 }
 ```
 
-Handicap formula (simplified):
+Handicap formula:
 
 1. Per round: `(your score − par) + (difficulty − 2)` — harder courses count a bit worse.
-2. Sort your rounds oldest → newest; in each **block of 3**, keep the **best** (lowest) value.
-3. Your handicap is the **average** of those bests (need at least **3 rounds** for one number; 6 rounds = 2 bests averaged, etc.).
+2. Take your **last 3 rounds** (by date).
+3. Keep the **best 2** (lowest adjusted values) and **average** them. You need at least **3 rounds** for a handicap.
 
 ## Run it
 

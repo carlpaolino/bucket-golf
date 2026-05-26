@@ -50,6 +50,8 @@ const STATE = {
 
 const STORAGE_KEY = "bucket-golf-rounds-v1";
 const PLAYER_STORAGE_KEY = "bucket-golf-player-v1";
+const HANDICAP_WINDOW = 3;
+const HANDICAP_BEST_COUNT = 2;
 
 /* -------- Supabase client (optional) --------
  *
@@ -293,7 +295,7 @@ async function updatePlayerHandicapSummary() {
   const rounds = await loadRounds();
   const hcap = computeSimpleHandicap(rounds);
   if (hcap.handicap == null) {
-    const need = Math.max(0, 3 - rounds.length);
+    const need = Math.max(0, HANDICAP_WINDOW - rounds.length);
     el.textContent =
       rounds.length === 0
         ? ""
@@ -302,7 +304,7 @@ async function updatePlayerHandicapSummary() {
           : "";
     return;
   }
-  el.textContent = `Handicap: ${formatHandicap(hcap.handicap)} (best of each 3 rounds · ${hcap.setsUsed} set${hcap.setsUsed === 1 ? "" : "s"})`;
+  el.textContent = `Handicap: ${formatHandicap(hcap.handicap)} (avg of best 2 of last 3 rounds)`;
 }
 
 function switchPlayer() {
@@ -644,13 +646,13 @@ function formatHandicap(diff) {
   return n > 0 ? `+${n}` : `${String(n)}`;
 }
 
-/* -------- Simple handicap (best 1 of each 3 rounds) --------
+/* -------- Handicap (best 2 of last 3 rounds) --------
  *
  * Per round: adjusted score vs par, with course difficulty 1–3
  * (1 = easy, 2 = normal, 3 = hard). Harder courses add strokes to the diff.
  *
- * Handicap = average of the best adjusted diff from each complete block of
- * 3 rounds (oldest → newest). Need at least 3 rounds for one value.
+ * Handicap = average of the best 2 adjusted diffs from the player's last 3
+ * rounds (by date). Need at least 3 rounds for a handicap.
  */
 function coursePar(course) {
   return course.pars.reduce((a, b) => a + b, 0);
@@ -671,21 +673,22 @@ function computeSimpleHandicap(rounds) {
   );
   const diffs = sorted.map(roundAdjustedDiff).filter((d) => d !== null);
 
-  const bests = [];
-  for (let i = 0; i + 3 <= diffs.length; i += 3) {
-    const chunk = diffs.slice(i, i + 3);
-    bests.push(Math.min(...chunk));
+  if (diffs.length < HANDICAP_WINDOW) {
+    return {
+      handicap: null,
+      roundsUsed: diffs.length,
+      roundsAveraged: 0,
+    };
   }
 
-  if (bests.length === 0) {
-    return { handicap: null, setsUsed: 0, roundsUsed: diffs.length };
-  }
+  const last = diffs.slice(-HANDICAP_WINDOW);
+  const best = [...last].sort((a, b) => a - b).slice(0, HANDICAP_BEST_COUNT);
+  const handicap = best.reduce((sum, d) => sum + d, 0) / best.length;
 
-  const handicap = bests.reduce((sum, d) => sum + d, 0) / bests.length;
   return {
     handicap,
-    setsUsed: bests.length,
-    roundsUsed: bests.length * 3,
+    roundsUsed: HANDICAP_WINDOW,
+    roundsAveraged: best.length,
   };
 }
 
@@ -978,7 +981,7 @@ function buildLeaderboardRows(allRounds) {
       name: displayNameForProfileId(profileId),
       roundsPlayed: playerRounds.length,
       handicap: hcap.handicap,
-      setsUsed: hcap.setsUsed,
+      roundsAveraged: hcap.roundsAveraged,
     });
   }
 
@@ -990,7 +993,7 @@ function buildLeaderboardRows(allRounds) {
         name,
         roundsPlayed: 0,
         handicap: null,
-        setsUsed: 0,
+        roundsAveraged: 0,
       });
     }
   }
@@ -1042,17 +1045,19 @@ async function renderLeaderboard() {
     const rank = row.handicap != null ? ++rankNum : "—";
     const hcap =
       row.handicap == null
-        ? row.roundsPlayed > 0 && row.roundsPlayed < 3
-          ? `Need ${3 - row.roundsPlayed} more`
+        ? row.roundsPlayed > 0 && row.roundsPlayed < HANDICAP_WINDOW
+          ? `Need ${HANDICAP_WINDOW - row.roundsPlayed} more`
           : "—"
         : formatHandicap(row.handicap);
     const you = row.profileId === activeId ? ' class="leaderboard-you"' : "";
-    const setsNote =
-      row.setsUsed > 0 ? `<span class="leaderboard-sets">${row.setsUsed}× best-of-3</span>` : "";
+    const methodNote =
+      row.roundsAveraged > 0
+        ? `<span class="leaderboard-sets">best 2 of last 3</span>`
+        : "";
     html += `
       <tr${you}>
         <td>${rank}</td>
-        <td>${escapeHtml(row.name)}${setsNote}</td>
+        <td>${escapeHtml(row.name)}${methodNote}</td>
         <td>${row.roundsPlayed}</td>
         <td>${hcap}</td>
       </tr>
