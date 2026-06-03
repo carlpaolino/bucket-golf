@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bucket Golf</title>
-  <link rel="stylesheet" href="styles.css?v=3" />
+  <link rel="stylesheet" href="styles.css?v=4" />
 </head>
 <body>
   <header class="hero">
@@ -57,6 +57,10 @@
 
       <section class="card" aria-labelledby="map-heading">
         <h2 id="map-heading">2. Course map</h2>
+        <p class="map-legend" role="note">
+          <span class="legend-item"><span class="legend-dot legend-dot--tee"></span>Grey circles are tee spots</span>
+          <span class="legend-item"><span class="legend-dot legend-dot--hole"></span>Red circles are the holes</span>
+        </p>
         <div id="course-map" class="map">
           <p class="map-empty">Select a course above to see the map.</p>
         </div>
@@ -149,6 +153,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="players.js"></script>
   <script src="config.js" onerror="window.__noConfig=true"></script>
-  <script src="script.js?v=19"></script>
+  <script src="script.js?v=27"></script>
 </body>
 </html>

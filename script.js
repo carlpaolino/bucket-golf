@@ -2,33 +2,35 @@
 
 const COURSES = [
   {
-    id: "backyard-classic",
-    name: "Backyard Classic",
-    description: "Wide open lawn — beginner friendly.",
-    difficulty: 2, // 1 = easy, 2 = normal, 3 = hard (edit per course)
-    pars: [3, 3, 4, 3, 4, 3, 3, 4, 3],
-    // holeDesign: optional SVG string overlaid on the shared map template
-  },
-  {
     id: "park-loop",
-    name: "Park Loop",
+    name: "beta 9",
     description: "A balanced loop through the trees.",
     difficulty: 2,
     pars: [4, 3, 4, 4, 3, 5, 3, 4, 4],
-  },
-  {
-    id: "beach-bash",
-    name: "Beach Bash",
-    description: "Sandy lies and ocean breeze.",
-    difficulty: 2,
-    pars: [3, 4, 3, 4, 5, 3, 4, 3, 4],
-  },
-  {
-    id: "mountain-9",
-    name: "Mountain Nine",
-    description: "Steep elevation, tricky greens.",
-    difficulty: 2,
-    pars: [4, 4, 5, 3, 4, 5, 3, 4, 5],
+    // Pin location for each hole (1–9) on the 700×420 map. Order = hole number.
+    holes: [
+      { x: 165, y: 140 },
+      { x: 600, y: 140 },
+      { x: 75, y: 375 },
+      { x: 600, y: 140 },
+      { x: 30, y: 140 },
+      { x: 20, y: 20 },
+      { x: 675, y: 20 },
+      { x: 50, y: 265 },
+      { x: 600, y: 140 },
+    ],
+    // Tee box for each hole (1–9); a dotted line connects each tee to its pin.
+    tees: [
+      { x: 500, y: 140 },
+      { x: 165, y: 190 },
+      { x: 600, y: 200 },
+      { x: 50, y: 350 },
+      { x: 600, y: 90 },
+      { x: 40, y: 350 },
+      { x: 100, y: 20 },
+      { x: 650, y: 140 },
+      { x: 165, y: 100 },
+    ],
   },
 ];
 
@@ -505,14 +507,70 @@ function renderMapTemplate() {
       </clipPath>
     </defs>
     ${renderMapTerrain(w, terrainH, gw)}
+    <ellipse class="map-dirt-oval" cx="80" cy="${Math.round(terrainH / 2)}" rx="31" ry="${Math.round(terrainH * 0.25)}" fill="#7a4f24" />
     ${renderMapHouse(w, h, terrainH, gw)}
     ${renderBunkers(terrainH, gw, grassRightX, w, h)}
   `;
 }
 
-/** Per-course hole art — set course.holeDesign to an SVG fragment when ready. */
+/** Group markers by coordinate so overlapping ones merge into one label (e.g. "2/4/9"). */
+function groupByCoord(points) {
+  const groups = new Map();
+  points.forEach((pos, i) => {
+    if (!pos) return;
+    const key = `${pos.x},${pos.y}`;
+    if (!groups.has(key)) groups.set(key, { x: pos.x, y: pos.y, nums: [] });
+    groups.get(key).nums.push(i + 1);
+  });
+  return groups;
+}
+
+/** Tee + dotted line + red pin markers for each hole. */
 function renderMapHoleOverlays(course) {
-  return course.holeDesign || "";
+  if (course.holeDesign) return course.holeDesign;
+  const holes = course.holes;
+  if (!Array.isArray(holes) || holes.length === 0) return "";
+  const tees = Array.isArray(course.tees) ? course.tees : [];
+
+  // Dotted lines from each tee to its matching pin (drawn first, underneath markers).
+  const lines = [];
+  holes.forEach((pin, i) => {
+    const tee = tees[i];
+    if (!pin || !tee) return;
+    lines.push(
+      `<line class="map-hole-line" x1="${tee.x}" y1="${tee.y}" x2="${pin.x}" y2="${pin.y}"
+        stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="1 7" opacity="0.85" />`
+    );
+  });
+
+  // Tee markers (dark) — numbered, merged when stacked.
+  const teeMarkers = [];
+  groupByCoord(tees).forEach(({ x, y, nums }) => {
+    const label = nums.join("/");
+    const r = label.length > 1 ? Math.round(6 + label.length * 2.4) : 8;
+    const fontSize = label.length > 1 ? 11 : 10;
+    teeMarkers.push(`
+      <g class="map-tee-pin">
+        <circle cx="${x}" cy="${y}" r="${r}" fill="#1f2937" stroke="#fff" stroke-width="2" />
+        <text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central"
+              font-size="${fontSize}" font-weight="700" fill="#fff">${label}</text>
+      </g>`);
+  });
+
+  const markers = [];
+  groupByCoord(holes).forEach(({ x, y, nums }) => {
+    const label = nums.join("/");
+    const r = label.length > 1 ? Math.round(7 + label.length * 2.6) : 9;
+    const fontSize = label.length > 1 ? 12 : 11;
+    markers.push(`
+      <g class="map-hole-pin">
+        <circle cx="${x}" cy="${y}" r="${r}" fill="#e23b3b" stroke="#fff" stroke-width="2" />
+        <text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central"
+              font-size="${fontSize}" font-weight="700" fill="#fff">${label}</text>
+      </g>`);
+  });
+
+  return lines.join("") + teeMarkers.join("") + markers.join("");
 }
 
 function renderMap() {

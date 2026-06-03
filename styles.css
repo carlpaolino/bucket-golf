@@ -323,6 +323,29 @@ html, body {
   text-align: center;
   margin: 96px 0;
 }
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffafb;
+  font-size: 14px;
+  color: var(--ink);
+}
+.legend-item { display: inline-flex; align-items: center; gap: 7px; }
+.legend-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--line);
+  flex: none;
+}
+.legend-dot--tee { background: #1f2937; }
+.legend-dot--hole { background: #e23b3b; }
 .map-svg { width: 100%; height: auto; display: block; }
 
 /* Score form */
